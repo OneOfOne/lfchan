@@ -9,7 +9,7 @@ import (
 func TestLFChan(t *testing.T) {
 	ch := New()
 	go func() {
-		for i := 0; i < 1000; i++ {
+		for i := 0; i < 100; i++ {
 			ch.Send(i)
 		}
 		ch.Close()

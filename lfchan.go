@@ -7,6 +7,8 @@ import (
 	"unsafe"
 )
 
+const ptrSize = unsafe.Sizeof((*interface{})(nil))
+
 type Chan struct {
 	q    []*interface{}
 	p    unsafe.Pointer
@@ -27,14 +29,14 @@ func NewSize(sz int) *Chan {
 }
 
 func (ch *Chan) Send(v interface{}) {
-	ln, idx := uintptr(len(ch.q)*8), uintptr(0)
+	ln, idx := uintptr(len(ch.q))*ptrSize, uintptr(0)
 	for atomic.LoadInt32(&ch.die) == 0 {
 		p := unsafe.Pointer(uintptr(ch.p) + idx)
 		if atomic.CompareAndSwapPointer((*unsafe.Pointer)(atomic.LoadPointer(&p)), nil, unsafe.Pointer(&v)) {
 			atomic.AddInt32(&ch.size, 1)
 			return
 		}
-		if idx += 8; idx == ln {
+		if idx += ptrSize; idx == ln {
 			time.Sleep(time.Millisecond)
 			idx = 0
 		}
@@ -43,14 +45,14 @@ func (ch *Chan) Send(v interface{}) {
 }
 
 func (ch *Chan) Recv() interface{} {
-	ln, idx := uintptr(len(ch.q)*8), uintptr(0)
+	ln, idx := uintptr(len(ch.q))*ptrSize, uintptr(0)
 	for atomic.LoadInt32(&ch.die) == 0 || atomic.LoadInt32(&ch.size) > 0 {
 		p := unsafe.Pointer(uintptr(ch.p) + idx)
 		if v := atomic.SwapPointer((*unsafe.Pointer)(atomic.LoadPointer(&p)), nil); v != nil {
 			atomic.AddInt32(&ch.size, -1)
 			return *(*interface{})(v)
 		}
-		if idx += 8; idx == ln {
+		if idx += ptrSize; idx == ln {
 			time.Sleep(time.Millisecond)
 			idx = 0
 		}
