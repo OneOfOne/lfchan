@@ -1,0 +1,9 @@
+language: go
+sudo: false
+
+go:
+  - 1.6
+  - tip
+
+script:
+  - go test -cpu 8 -v ./...

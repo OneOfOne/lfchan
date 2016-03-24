@@ -1,23 +1,29 @@
 package lfchan
 
 import (
+	"runtime"
 	"sync/atomic"
 	"testing"
 )
 
-func Test(t *testing.T) {
+func TestLFChan(t *testing.T) {
 	ch := New()
-	ch.Send(1)
-	go ch.Send(2)
-	go ch.Send(3)
-	go ch.Send(4)
-	go ch.Send(5)
-	t.Log(ch.Recv(), ch.Recv(), ch.Recv(), ch.Recv(), ch.Recv(), ch)
+	go func() {
+		for i := 0; i < 1000; i++ {
+			ch.Send(i)
+		}
+		ch.Close()
+	}()
+	for v, i := ch.Recv(), 0; v != nil; v, i = ch.Recv(), i+1 {
+		if v.(int) != i {
+			t.Fatalf("wanted %v, got %v", i, v)
+		}
+	}
 }
 
 func BenchmarkLFChan(b *testing.B) {
 	var cnt uint64
-	ch := NewSize(4)
+	ch := NewSize(runtime.NumCPU())
 	var total uint64
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
@@ -29,7 +35,7 @@ func BenchmarkLFChan(b *testing.B) {
 
 func BenchmarkChan(b *testing.B) {
 	var cnt uint64
-	ch := make(chan interface{}, 4)
+	ch := make(chan interface{}, runtime.NumCPU())
 	var total uint64
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
