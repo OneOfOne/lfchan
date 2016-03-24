@@ -14,10 +14,12 @@ func TestLFChan(t *testing.T) {
 		}
 		ch.Close()
 	}()
-	for v, i := ch.Recv(), 0; v != nil; v, i = ch.Recv(), i+1 {
+	var i int
+	for v, ok := ch.Recv(); ok && v != nil; v, ok = ch.Recv() {
 		if v.(int) != i {
 			t.Fatalf("wanted %v, got %v", i, v)
 		}
+		i++
 	}
 }
 
@@ -28,7 +30,8 @@ func BenchmarkLFChan(b *testing.B) {
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
 			ch.Send(atomic.AddUint64(&cnt, 1))
-			atomic.AddUint64(&total, ch.Recv().(uint64))
+			v, _ := ch.Recv()
+			atomic.AddUint64(&total, v.(uint64))
 		}
 	})
 }
