@@ -41,7 +41,7 @@ BenchmarkChan-8         20000000               331 ns/op               8 B/op   
 BenchmarkChan-32        10000000               532 ns/op               8 B/op          1 allocs/op
 
 PASS
-ok      github.com/OneOfOne/lfchan      28.613s
+ok      github.com/OneOfOne/lfchan      51.663s
 ```
 
 ## License
