@@ -19,10 +19,10 @@ func New() *Chan {
 	return NewSize(1)
 }
 
-// New creates a buffered channel, with minimum length of 1
+// NewSize creates a buffered channel, with minimum length of 1
 func NewSize(sz int) *Chan {
 	if sz < 1 {
-		sz = 1
+		panic("sz < 1")
 	}
 	ch := &Chan{
 		q:       make([]AtomicValue, sz),

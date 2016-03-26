@@ -7,47 +7,50 @@ import (
 
 // AtomicValue is an atomic value using a spinlock
 type AtomicValue struct {
-	v    interface{}
-	lock uint32
+	v  interface{}
+	lk uint32
 }
 
-func (a *AtomicValue) Lock() {
-	for !atomic.CompareAndSwapUint32(&a.lock, 0, 1) {
+func (a *AtomicValue) lock() {
+	for !atomic.CompareAndSwapUint32(&a.lk, 0, 1) {
 		runtime.Gosched()
 	}
 }
 
-func (a *AtomicValue) Unlock() {
-	atomic.StoreUint32(&a.lock, 0)
-}
+func (a *AtomicValue) unlock() { atomic.StoreUint32(&a.lk, 0) }
 
+// Store atomically sets the current value.
 func (a *AtomicValue) Store(v interface{}) {
-	a.Lock()
+	a.lock()
 	a.v = v
-	a.Unlock()
+	a.unlock()
 }
 
+// Load atomically returns the current value.
 func (a *AtomicValue) Load() interface{} {
-	a.Lock()
+	a.lock()
 	v := a.v
-	a.Unlock()
+	a.unlock()
 	return v
 }
 
-func (a *AtomicValue) CompareAndSwap(oval, nval interface{}) bool {
+// CompareAndSwap atomically compares oldVal to the current value and replaces it with newVal if it's the same,
+// returns true if it was successfully replaced.
+func (a *AtomicValue) CompareAndSwap(oldVal, newVal interface{}) bool {
 	var b bool
-	a.Lock()
-	if b = a.v == oval; b {
-		a.v = nval
+	a.lock()
+	if b = a.v == oldVal; b {
+		a.v = newVal
 	}
-	a.Unlock()
+	a.unlock()
 	return b
 }
 
-func (a *AtomicValue) Swap(nval interface{}) interface{} {
+// Swap atomically swaps the current value with newVal and returns the old value.
+func (a *AtomicValue) Swap(newVal interface{}) interface{} {
 	var v interface{}
-	a.Lock()
-	v, a.v = a.v, nval
-	a.Unlock()
+	a.lock()
+	v, a.v = a.v, newVal
+	a.unlock()
 	return v
 }
