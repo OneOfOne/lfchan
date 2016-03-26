@@ -34,10 +34,14 @@ func TestSelect(t *testing.T) {
 	var chs [100]Chan
 	for i := range chs {
 		chs[i] = New()
-		chs[i].Send(i, true)
 	}
 	for i := range chs {
-		if v, ok := Select(false, chs[:]...); !ok || v != i {
+		if !SelectSend(false, i, chs[:]...) {
+			t.Fatalf("couldn't send %d", i)
+		}
+	}
+	for i := range chs {
+		if v, ok := SelectRecv(false, chs[:]...); !ok || v != i {
 			t.Fatalf("wanted %v, got %v", i, v)
 		}
 	}

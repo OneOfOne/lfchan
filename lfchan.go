@@ -37,8 +37,12 @@ func NewSize(sz int) Chan {
 
 // Send adds v to the buffer of the channel and returns true, if the channel is closed it returns false
 func (ch Chan) Send(v interface{}, block bool) bool {
+	if !block && ch.Len() == ch.Cap() {
+		return false
+	}
 	ncpu, ln, cnt := uint32(runtime.NumCPU()), uint32(len(ch.q)), uint32(0)
 	for !ch.Closed() {
+
 		i := atomic.AddUint32(&ch.sendIdx, 1)
 		if ch.q[i%ln].CompareAndSwap(nil, v) {
 			atomic.AddInt32(&ch.len, 1)
@@ -61,10 +65,10 @@ func (ch Chan) Send(v interface{}, block bool) bool {
 // Recv blocks until a value is available and returns v, true, or if the channel is closed and
 // the buffer is empty, it will return nil, false
 func (ch Chan) Recv(block bool) (interface{}, bool) {
-	ncpu, ln, cnt := uint32(runtime.NumCPU()), uint32(len(ch.q)), uint32(0)
 	if !block && ch.Len() == 0 { // fast path
-		goto EXIT
+		return nil, false
 	}
+	ncpu, ln, cnt := uint32(runtime.NumCPU()), uint32(len(ch.q)), uint32(0)
 	for !ch.Closed() || ch.Len() > 0 {
 		i := atomic.AddUint32(&ch.recvIdx, 1)
 		if v := ch.q[i%ln].Swap(nil); v != nil {
@@ -82,7 +86,6 @@ func (ch Chan) Recv(block bool) (interface{}, bool) {
 		}
 		runtime.Gosched()
 	}
-EXIT:
 	return nil, false
 }
 
@@ -98,8 +101,25 @@ func (ch Chan) Cap() int { return len(ch.q) }
 // Len returns the number of elements queued
 func (ch Chan) Len() int { return int(atomic.LoadInt32(&ch.len)) }
 
-// Select returns the first available value
-func Select(block bool, chans ...Chan) (interface{}, bool) {
+// SelectSend sends v to the first available channel, if block is true, it blocks until a channel a accepts the value.
+// returns false if all channels were full and block is false.
+func SelectSend(block bool, v interface{}, chans ...Chan) bool {
+	for {
+		for i := range chans {
+			if ok := chans[i].Send(v, false); ok {
+				return ok
+			}
+		}
+		if !block {
+			return false
+		}
+		runtime.Gosched()
+	}
+}
+
+// SelectRecv returns the first available value from chans, if block is true, it blocks until a value is available.
+// returns nil, false if all channels were empty and block is false.
+func SelectRecv(block bool, chans ...Chan) (interface{}, bool) {
 	for {
 		for i := range chans {
 			if v, ok := chans[i].Recv(false); ok {
