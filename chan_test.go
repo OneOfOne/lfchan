@@ -31,7 +31,7 @@ func TestLFChan(t *testing.T) {
 }
 
 func TestSelect(t *testing.T) {
-	var chs [100]*Chan
+	var chs [100]Chan
 	for i := range chs {
 		chs[i] = New()
 		chs[i].Send(i, true)

@@ -5,8 +5,7 @@ import (
 	"sync/atomic"
 )
 
-// Chan is a lock free channel that supports concurrent channel operations.
-type Chan struct {
+type innerChan struct {
 	q       []AtomicValue
 	sendIdx uint32
 	recvIdx uint32
@@ -14,26 +13,30 @@ type Chan struct {
 	die     int32
 }
 
+// Chan is a lock free channel that supports concurrent channel operations.
+type Chan struct {
+	*innerChan
+}
+
 // New returns a new channel with the buffer set to 1
-func New() *Chan {
+func New() Chan {
 	return NewSize(1)
 }
 
 // NewSize creates a buffered channel, with minimum length of 1
-func NewSize(sz int) *Chan {
+func NewSize(sz int) Chan {
 	if sz < 1 {
 		panic("sz < 1")
 	}
-	ch := &Chan{
+	return Chan{&innerChan{
 		q:       make([]AtomicValue, sz),
 		sendIdx: ^uint32(0),
 		recvIdx: ^uint32(0),
-	}
-	return ch
+	}}
 }
 
 // Send adds v to the buffer of the channel and returns true, if the channel is closed it returns false
-func (ch *Chan) Send(v interface{}, block bool) bool {
+func (ch Chan) Send(v interface{}, block bool) bool {
 	ncpu, ln, cnt := uint32(runtime.NumCPU()), uint32(len(ch.q)), uint32(0)
 	for !ch.Closed() {
 		i := atomic.AddUint32(&ch.sendIdx, 1)
@@ -57,7 +60,7 @@ func (ch *Chan) Send(v interface{}, block bool) bool {
 
 // Recv blocks until a value is available and returns v, true, or if the channel is closed and
 // the buffer is empty, it will return nil, false
-func (ch *Chan) Recv(block bool) (interface{}, bool) {
+func (ch Chan) Recv(block bool) (interface{}, bool) {
 	ncpu, ln, cnt := uint32(runtime.NumCPU()), uint32(len(ch.q)), uint32(0)
 	if !block && ch.Len() == 0 { // fast path
 		goto EXIT
@@ -84,22 +87,22 @@ EXIT:
 }
 
 // Close marks the channel as closed
-func (ch *Chan) Close() { atomic.StoreInt32(&ch.die, 1) }
+func (ch Chan) Close() { atomic.StoreInt32(&ch.die, 1) }
 
 // Closed returns true if the channel have been closed
-func (ch *Chan) Closed() bool { return atomic.LoadInt32(&ch.die) == 1 }
+func (ch Chan) Closed() bool { return atomic.LoadInt32(&ch.die) == 1 }
 
 // Cap returns the size of the internal queue
-func (ch *Chan) Cap() int { return len(ch.q) }
+func (ch Chan) Cap() int { return len(ch.q) }
 
 // Len returns the number of elements queued
-func (ch *Chan) Len() int { return int(atomic.LoadInt32(&ch.len)) }
+func (ch Chan) Len() int { return int(atomic.LoadInt32(&ch.len)) }
 
 // Select returns the first available value
-func Select(block bool, chans ...*Chan) (interface{}, bool) {
+func Select(block bool, chans ...Chan) (interface{}, bool) {
 	for {
-		for _, ch := range chans {
-			if v, ok := ch.Recv(false); ok {
+		for i := range chans {
+			if v, ok := chans[i].Recv(false); ok {
 				return v, ok
 			}
 		}
