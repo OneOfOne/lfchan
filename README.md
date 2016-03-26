@@ -3,6 +3,11 @@
 
 Extremely simple lock-free blocking channel implementation.
 
+- Supports graceful closing..
+- Supports blocking and non-blocking operations.
+- Supports select.
+- Scales with the number of cores.
+
 ## Install
 
 	go get github.com/OneOfOne/lfchan
@@ -19,8 +24,8 @@ import (
 func main() {
 	ch := lfchan.New() // or
 	// ch := lfchan.NewSize(10) // buffered channel
-	go ch.Send("hello")
-	fmt.Printf("%s world", ch.Recv().(string))
+	go ch.Send("hello", true)
+	fmt.Printf("%s world", ch.Recv(true).(string))
 }
 ```
 
@@ -28,20 +33,20 @@ func main() {
 ```bash
 ➜ go test -bench=. -benchmem -cpu 1,4,8,32 -benchtime 3s
 
-# 	ch := NewSize(runtime.NumCPU())
-BenchmarkLFChan         30000000               168 ns/op              40 B/op          4 allocs/op
-BenchmarkLFChan-4       30000000               175 ns/op              45 B/op          4 allocs/op
-BenchmarkLFChan-8       20000000               205 ns/op              45 B/op          4 allocs/op
-BenchmarkLFChan-32      20000000               201 ns/op              45 B/op          4 allocs/op
+# ch := NewSize(100)
+BenchmarkLFChan         20000000               292 ns/op               8 B/op          1 allocs/op
+BenchmarkLFChan-4       20000000               202 ns/op               8 B/op          1 allocs/op
+BenchmarkLFChan-8       30000000               161 ns/op               8 B/op          1 allocs/op
+BenchmarkLFChan-32      20000000               215 ns/op               8 B/op          1 allocs/op
 
-# ch := make(chan interface{}, runtime.NumCPU())
-BenchmarkChan           50000000               115 ns/op               8 B/op          1 allocs/op
-BenchmarkChan-4         20000000               261 ns/op               8 B/op          1 allocs/op
-BenchmarkChan-8         20000000               331 ns/op               8 B/op          1 allocs/op
-BenchmarkChan-32        10000000               532 ns/op               8 B/op          1 allocs/op
+# ch := make(chan interface{}, 100)
+BenchmarkChan           10000000               371 ns/op               8 B/op          1 allocs/op
+BenchmarkChan-4         10000000               378 ns/op               8 B/op          1 allocs/op
+BenchmarkChan-8         10000000               506 ns/op               8 B/op          1 allocs/op
+BenchmarkChan-32        10000000               513 ns/op               8 B/op          1 allocs/op
 
 PASS
-ok      github.com/OneOfOne/lfchan      51.663s
+ok      github.com/OneOfOne/lfchan      39.461s
 ```
 
 ## License
