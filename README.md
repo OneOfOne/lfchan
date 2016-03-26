@@ -1,9 +1,9 @@
 # lfchan [![GoDoc](http://godoc.org/github.com/OneOfOne/lfchan?status.svg)](http://godoc.org/github.com/OneOfOne/lfchan) [![Build Status](https://travis-ci.org/OneOfOne/lfchan.svg?branch=master)](https://travis-ci.org/OneOfOne/lfchan)
 --
 
-Extremely simple lock-free blocking channel implementation.
+A scalable lock-free channel.
 
-- Supports graceful closing..
+- Supports graceful closing.
 - Supports blocking and non-blocking operations.
 - Supports select.
 - Scales with the number of cores.
