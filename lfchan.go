@@ -89,6 +89,12 @@ func (ch Chan) Recv(block bool) (interface{}, bool) {
 	return nil, false
 }
 
+// RecvOnly returns a receive-only channel.
+func (ch Chan) RecvOnly() RecvOnly { return RecvOnly{ch} }
+
+// RecvOnly returns a send-only channel.
+func (ch Chan) SendOnly() SendOnly { return SendOnly{ch} }
+
 // Close marks the channel as closed
 func (ch Chan) Close() { atomic.StoreInt32(&ch.die, 1) }
 
@@ -132,3 +138,15 @@ func SelectRecv(block bool, chans ...Chan) (interface{}, bool) {
 		runtime.Gosched()
 	}
 }
+
+// RecvOnly is a channel only has receive operations.
+type RecvOnly struct{ c Chan }
+
+// Recv
+func (ro RecvOnly) Recv(block bool) (interface{}, bool) { return ro.c.Recv(block) }
+
+// SebdOnly is a channel only has send operations.
+type SendOnly struct{ c Chan }
+
+// Send
+func (so SendOnly) Send(v interface{}, block bool) bool { return so.c.Send(v, block) }
