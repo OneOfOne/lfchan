@@ -70,22 +70,17 @@ Fixed by commit [bdddd90](https://github.com/OneOfOne/lfchan/commit/bdddd904676f
 
 # Benchmark
 ```bash
-➜ go test -bench=. -benchmem -cpu 1,4,8,32 -benchtime 3s
-
 # ch := NewSize(100)
-BenchmarkLFChan         20000000               292 ns/op               8 B/op          1 allocs/op
-BenchmarkLFChan-4       20000000               202 ns/op               8 B/op          1 allocs/op
-BenchmarkLFChan-8       30000000               161 ns/op               8 B/op          1 allocs/op
-BenchmarkLFChan-32      20000000               215 ns/op               8 B/op          1 allocs/op
+BenchmarkLFChan         50000000               344 ns/op               8 B/op          1 allocs/op
+BenchmarkLFChan-4       50000000               275 ns/op               8 B/op          1 allocs/op
+BenchmarkLFChan-8       50000000               298 ns/op               8 B/op          1 allocs/op
 
 # ch := make(chan interface{}, 100)
-BenchmarkChan           10000000               371 ns/op               8 B/op          1 allocs/op
-BenchmarkChan-4         10000000               378 ns/op               8 B/op          1 allocs/op
-BenchmarkChan-8         10000000               506 ns/op               8 B/op          1 allocs/op
-BenchmarkChan-32        10000000               513 ns/op               8 B/op          1 allocs/op
-
+BenchmarkChan           50000000               382 ns/op               8 B/op          1 allocs/op
+BenchmarkChan-4         50000000               389 ns/op               8 B/op          1 allocs/op
+BenchmarkChan-8         30000000               500 ns/op               8 B/op          1 allocs/op
 PASS
-ok      github.com/OneOfOne/lfchan      39.461s
+ok      github.com/OneOfOne/lfchan      128.469s
 ```
 
 # FAQ
