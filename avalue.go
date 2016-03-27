@@ -38,27 +38,6 @@ func (a *aValue) Load() interface{} {
 	return v
 }
 
-// CompareAndSwap atomically compares oldVal to the current value and replaces it with newVal if it's the same,
-// returns true if it was successfully replaced.
-func (a *aValue) CompareAndSwap(oldVal, newVal interface{}) bool {
-	var b bool
-	a.lock()
-	if b = a.v == oldVal; b {
-		a.v = newVal
-	}
-	a.unlock()
-	return b
-}
-
-// Swap atomically swaps the current value with newVal and returns the old value.
-func (a *aValue) Swap(newVal interface{}) interface{} {
-	var v interface{}
-	a.lock()
-	v, a.v = a.v, newVal
-	a.unlock()
-	return v
-}
-
 func (a *aValue) CompareAndSwapIfNil(newVal interface{}) bool {
 	var b bool
 	a.lock()

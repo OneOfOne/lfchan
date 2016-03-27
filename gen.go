@@ -22,11 +22,23 @@ var files = [...]string{
 
 func main() {
 	log.SetFlags(log.Lshortfile)
-	log.SetPrefix("lfchan gen:")
-	typ, typName := arg(1), arg(2)
+	log.SetPrefix("lfchan: ")
+	var (
+		typ, typName = arg(1), arg(2)
+		importPkg    string
+		repl         *strings.Replacer
+	)
 	if typ == "" || typ == "*" {
 		log.Fatal("must pass a type")
 	}
+	if idx := strings.LastIndex(typ, "."); idx > 0 {
+		sidx := strings.LastIndex(typ, "/")
+		if sidx == -1 || sidx == len(typ)-1 {
+			log.Fatalf("unexpected type value: %s", typ)
+		}
+		importPkg, typ = strings.Replace(typ[:idx], "*", "", -1), typ[sidx+1:]
+	}
+
 	if typName == "" {
 		if typ[0] == '*' {
 			typName = typ[1:]
@@ -34,10 +46,19 @@ func main() {
 			typName = typ
 		}
 	}
+
 	if err := os.MkdirAll(typName, 0755); err != nil {
 		log.Fatalf("os.MkdirAll(%q, 0755): %v", typName, err)
 	}
-	repl := strings.NewReplacer("interface{}", typ, "package lfchan", "package "+filepath.Base(typName))
+	if importPkg != "" {
+		repl = strings.NewReplacer(
+			"interface{}", typ,
+			"package lfchan", "package "+filepath.Base(typName),
+			"import (", fmt.Sprintf("import (\n\t%q\n", importPkg),
+		)
+	} else {
+		repl = strings.NewReplacer("interface{}", typ, "package lfchan", "package "+filepath.Base(typName))
+	}
 	log.Printf("creating %s", typName)
 	for _, fn := range files {
 		f, err := os.Open(os.ExpandEnv(fn))
@@ -56,7 +77,7 @@ func main() {
 		}
 		of.Close()
 	}
-	if err := ioutil.WriteFile(filepath.Join(typName, "chan_test.go"), []byte(fmt.Sprintf(testCode, typName, typ, typ)), 0644); err != nil {
+	if err := ioutil.WriteFile(filepath.Join(typName, "chan_test.go"), []byte(repl.Replace(testCode)), 0644); err != nil {
 		log.Fatal(err)
 	}
 	out, err := exec.Command("go", "test", "./"+typName+"/...").CombinedOutput()
@@ -72,7 +93,7 @@ func arg(idx int) string {
 	return os.Args[idx]
 }
 
-const testCode = `package %s
+const testCode = `package lfchan
 
 import (
 	"math/rand"
@@ -83,10 +104,15 @@ import (
 
 func Test(t *testing.T) {
 	var (
+		N = 10000
 		iv reflect.Value
 		typ  = reflect.TypeOf(nilValue)
-		zero = reflect.Zero(typ).Interface().(%s)
+		zero = reflect.Zero(typ).Interface().(interface{})
+		ch = NewSize(100)
 	)
+	if testing.Short() {
+		N = 1000
+	}
 	for {
 		var ok bool
 		if iv, ok = quick.Value(typ, rand.New(rand.NewSource(43))); !ok {
@@ -97,28 +123,27 @@ func Test(t *testing.T) {
 		}
 		break
 	}
-	rv, ok := iv.Interface().(%s)
+	rv, ok := iv.Interface().(interface{})
 	if !ok {
 		t.SkipNow()
 	}
-	ch := New()
 	go func() {
-		for i := 0; i < 100; i++ {
+		for i := 0; i < N; i++ {
 			ch.Send(rv, true)
 		}
 		ch.Send(zero, true)
 		ch.Close()
 	}()
-	for i := 0; i < 100; i++ {
+	for i := 0; i < N; i++ {
 		v, ok := ch.Recv(true)
 		if !ok {
 			t.Fatal("!ok")
 		}
-		if v != rv {
+		if !reflect.DeepEqual(v, rv) {
 			t.Fatalf("wanted %%v, got %%v", rv, v)
 		}
 	}
-	if v, ok := ch.Recv(true); !ok || v != zero {
+	if v, ok := ch.Recv(true); !ok || !reflect.DeepEqual(v, zero){
 		t.Fatal("!ok || v != zero")
 	}
 }

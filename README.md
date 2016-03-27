@@ -35,8 +35,12 @@ func main() {
 ``` bash
 go run "$GOPATH/src/github.com/OneOfOne/lfchan/gen.go" type [pkgName]
 
-# example
-go run "$GOPATH/src/github.com/OneOfOne/lfchan/gen.go" *Node nodeChan
+# primitve type
+go run "$GOPATH/src/github.com/OneOfOne/lfchan/gen.go" string internal/stringChan
+
+# or for using a non-native type
+
+go run "$GOPATH/src/github.com/OneOfOne/lfchan/gen.go" github.com/OneOfOne/cmap.CMap internal/cmapChan
 
 ```
 
@@ -46,27 +50,36 @@ go run "$GOPATH/src/github.com/OneOfOne/lfchan/gen.go" *Node nodeChan
 import (
 	"fmt"
 
-	"github.com/YOU/nodeChan"
+	"github.com/OneOfOne/cmap"
+	"github.com/YOU/internal/stringChan"
 )
 
 func main() {
-	ch := nodeChan.New() // or
-	// ch := nodeChan.NewSize(10) // buffered channel
-	go ch.Send(&Node{1}, true)
-	for n, ok := ch.Recv(true); ok; n, ok = ch.Recv(true) {
-		// handle n
+	ch := stringChan.New() // or
+	// ch := stringChan.NewSize(10) // buffered channel
+	go func() {
+		go ch.Send("lfchan", true)
+		ch.Send("hello", true)
+	}()
+	for s, ok := ch.Recv(true); ok; s, ok = ch.Recv(true) {
+		fmt.Print(s, " ")
 	}
+	fmt.Println()
 }
 
 ```
 
-**Warning** currently, typed channels can't handle zero value primitve types correctly,
-for example it can't handle sending 0 on an int channel.
+
 
 # Known issues
 
 - <strike>Under high concurrency, ch.Len() can return -1 (issue [#2](https://github.com/OneOfOne/lfchan/issues/2))</strike>
 Fixed by commit [bdddd90](https://github.com/OneOfOne/lfchan/commit/bdddd904676fc8368064cc2eb21efaa4384cd2db).
+
+- <strike>typed channels can't handle zero value primitve types correctly,
+for example it can't handle sending 0 on an int channel</strike> Fixed.
+
+- gen.go can't handle maps to non-native types.
 
 # Benchmark
 ```bash
