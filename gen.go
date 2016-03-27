@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 )
@@ -37,7 +38,7 @@ func main() {
 		log.Fatalf("os.MkdirAll(%q, 0755): %v", typName, err)
 	}
 	repl := strings.NewReplacer("interface{}", typ, "package lfchan", "package "+filepath.Base(typName))
-	log.Printf("outputting to %s", typName)
+	log.Printf("creating %s", typName)
 	for _, fn := range files {
 		f, err := os.Open(os.ExpandEnv(fn))
 		if err != nil {
@@ -55,8 +56,12 @@ func main() {
 		}
 		of.Close()
 	}
-	if err := ioutil.WriteFile(filepath.Join(typName, "chan_test.go"), []byte(fmt.Sprintf(testCode, typName, typ)), 0644); err != nil {
+	if err := ioutil.WriteFile(filepath.Join(typName, "chan_test.go"), []byte(fmt.Sprintf(testCode, typName, typ, typ)), 0644); err != nil {
 		log.Fatal(err)
+	}
+	out, err := exec.Command("go", "test", "./"+typName+"/...").CombinedOutput()
+	if err != nil {
+		log.Fatalf("error running tests: %s %v", out, err)
 	}
 }
 
@@ -77,10 +82,14 @@ import (
 )
 
 func Test(t *testing.T) {
-	var iv reflect.Value
+	var (
+		iv reflect.Value
+		typ  = reflect.TypeOf(nilValue)
+		zero = reflect.Zero(typ).Interface().(%s)
+	)
 	for {
 		var ok bool
-		if iv, ok = quick.Value(reflect.TypeOf(nilValue), rand.New(rand.NewSource(43))); !ok {
+		if iv, ok = quick.Value(typ, rand.New(rand.NewSource(43))); !ok {
 			t.SkipNow()
 		}
 		if iv.Kind() == reflect.Ptr && iv.IsNil() {
@@ -88,7 +97,7 @@ func Test(t *testing.T) {
 		}
 		break
 	}
-	rv, ok := iv.Interface().(%v)
+	rv, ok := iv.Interface().(%s)
 	if !ok {
 		t.SkipNow()
 	}
@@ -97,12 +106,20 @@ func Test(t *testing.T) {
 		for i := 0; i < 100; i++ {
 			ch.Send(rv, true)
 		}
+		ch.Send(zero, true)
 		ch.Close()
 	}()
-	for v, ok := ch.Recv(true); ok; v, ok = ch.Recv(true) {
+	for i := 0; i < 100; i++ {
+		v, ok := ch.Recv(true)
+		if !ok {
+			t.Fatal("!ok")
+		}
 		if v != rv {
 			t.Fatalf("wanted %%v, got %%v", rv, v)
 		}
+	}
+	if v, ok := ch.Recv(true); !ok || v != zero {
+		t.Fatal("!ok || v != zero")
 	}
 }
 `

@@ -52,7 +52,7 @@ func (ch Chan) Send(v interface{}, block bool) bool {
 			continue
 		}
 		i := atomic.AddUint32(&ch.sendIdx, 1)
-		if ch.q[i%ln].CompareAndSwap(nilValue, v) {
+		if ch.q[i%ln].CompareAndSwapIfNil(v) {
 			atomic.AddUint32(&ch.slen, 1)
 			return true
 		}
@@ -78,13 +78,13 @@ func (ch Chan) Recv(block bool) (interface{}, bool) {
 	for !ch.Closed() || ch.Len() > 0 {
 		if ch.Len() == 0 {
 			if !block {
-				return nil, false
+				return nilValue, false
 			}
 			runtime.Gosched()
 			continue
 		}
 		i := atomic.AddUint32(&ch.recvIdx, 1)
-		if v := ch.q[i%ln].Swap(nilValue); v != nilValue {
+		if v, ok := ch.q[i%ln].SwapWithNil(); ok {
 			atomic.AddUint32(&ch.rlen, 1)
 			return v, true
 		}
