@@ -29,6 +29,38 @@ func main() {
 }
 ```
 
+## Generate a typed channel
+
+### Generate the package:
+``` bash
+go run "$GOPATH/src/github.com/OneOfOne/lfchan/gen.go" type [pkgName]
+
+# example
+go run "$GOPATH/src/github.com/OneOfOne/lfchan/gen.go" *node nodeChan
+
+```
+
+### Use it in your code:
+
+```go
+import (
+	"fmt"
+
+	"github.com/YOU/nodeChan"
+)
+
+func main() {
+	ch := nodeChan.New() // or
+	// ch := nodeChan.NewSize(10) // buffered channel
+	go ch.Send(&node{1}, true)
+	fmt.Printf("%#+v", ch.Recv(true))
+}
+
+```
+
+**Warning** currently, it doesn't handle zero value primitve types correctly,
+for example it can't handle sending 0 on an int channel.
+
 ## Benchmark
 ```bash
 ➜ go test -bench=. -benchmem -cpu 1,4,8,32 -benchtime 3s

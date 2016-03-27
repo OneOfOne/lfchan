@@ -38,13 +38,16 @@ func NewSize(sz int) Chan {
 
 // Send adds v to the buffer of the channel and returns true, if the channel is closed it returns false
 func (ch Chan) Send(v interface{}, block bool) bool {
+	if v == nilValue {
+		panic("can't send an empty value")
+	}
 	if !block && ch.Len() == ch.Cap() {
 		return false
 	}
 	ncpu, ln, cnt := uint32(runtime.NumCPU()), uint32(len(ch.q)), uint32(0)
 	for !ch.Closed() {
 		i := atomic.AddUint32(&ch.sendIdx, 1)
-		if ch.q[i%ln].CompareAndSwap(nil, v) {
+		if ch.q[i%ln].CompareAndSwap(nilValue, v) {
 			atomic.AddInt32(&ch.len, 1)
 			return true
 		}
@@ -64,12 +67,12 @@ func (ch Chan) Send(v interface{}, block bool) bool {
 // the buffer is empty, it will return nil, false
 func (ch Chan) Recv(block bool) (interface{}, bool) {
 	if !block && ch.Len() == 0 { // fast path
-		return nil, false
+		return nilValue, false
 	}
 	ncpu, ln, cnt := uint32(runtime.NumCPU()), uint32(len(ch.q)), uint32(0)
 	for !ch.Closed() || ch.Len() > 0 {
 		i := atomic.AddUint32(&ch.recvIdx, 1)
-		if v := ch.q[i%ln].Swap(nil); v != nil {
+		if v := ch.q[i%ln].Swap(nilValue); v != nilValue {
 			atomic.AddInt32(&ch.len, -1)
 			return v, true
 		}
@@ -82,7 +85,7 @@ func (ch Chan) Recv(block bool) (interface{}, bool) {
 		}
 		runtime.Gosched()
 	}
-	return nil, false
+	return nilValue, false
 }
 
 // SendOnly returns a send-only channel.
@@ -129,7 +132,7 @@ func SelectRecv(block bool, chans ...Chan) (interface{}, bool) {
 			}
 		}
 		if !block {
-			return nil, false
+			return nilValue, false
 		}
 		pause(1)
 	}
@@ -173,7 +176,7 @@ func SelectRecvOnly(block bool, chans ...RecvOnly) (interface{}, bool) {
 			}
 		}
 		if !block {
-			return nil, false
+			return nilValue, false
 		}
 		pause(1)
 	}

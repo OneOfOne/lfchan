@@ -5,6 +5,9 @@ import (
 	"sync/atomic"
 )
 
+// TODO handle primitve types
+var nilValue interface{}
+
 // AtomicValue is an atomic value using a spinlock
 type AtomicValue struct {
 	v  interface{}
