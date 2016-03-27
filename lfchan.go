@@ -7,7 +7,7 @@ import (
 )
 
 type innerChan struct {
-	q       []AtomicValue
+	q       []aValue
 	sendIdx uint32
 	recvIdx uint32
 	slen    uint32
@@ -31,7 +31,7 @@ func NewSize(sz int) Chan {
 		panic("sz < 1")
 	}
 	return Chan{&innerChan{
-		q:       make([]AtomicValue, sz),
+		q:       make([]aValue, sz),
 		sendIdx: ^uint32(0),
 		recvIdx: ^uint32(0),
 	}}

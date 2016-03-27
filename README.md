@@ -8,11 +8,11 @@ A scalable lock-free channel.
 - Supports select.
 - Scales with the number of cores.
 
-## Install
+# Install
 
 	go get github.com/OneOfOne/lfchan
 
-## Usage
+# Usage
 
 ```go
 import (
@@ -29,9 +29,9 @@ func main() {
 }
 ```
 
-## Generate a typed channel
+# Generate a typed channel
 
-### Generate the package:
+## Generate the package:
 ``` bash
 go run "$GOPATH/src/github.com/OneOfOne/lfchan/gen.go" type [pkgName]
 
@@ -40,7 +40,7 @@ go run "$GOPATH/src/github.com/OneOfOne/lfchan/gen.go" *Node nodeChan
 
 ```
 
-### Use it in your code:
+## Use it in your code:
 
 ```go
 import (
@@ -63,11 +63,12 @@ func main() {
 **Warning** currently, typed channels can't handle zero value primitve types correctly,
 for example it can't handle sending 0 on an int channel.
 
-## Known issues
+# Known issues
 
-- Under high concurrency, ch.Len() can return -1 (issue #2).
+- <strike>Under high concurrency, ch.Len() can return -1 (issue [#2](https://github.com/OneOfOne/lfchan/issues/2))</strike>
+Fixed by commit [bdddd90](https://github.com/OneOfOne/lfchan/commit/bdddd904676fc8368064cc2eb21efaa4384cd2db).
 
-## Benchmark
+# Benchmark
 ```bash
 ➜ go test -bench=. -benchmem -cpu 1,4,8,32 -benchtime 3s
 
@@ -87,33 +88,19 @@ PASS
 ok      github.com/OneOfOne/lfchan      39.461s
 ```
 
-## FAQ
+# FAQ
 
-### Why are you using `runtime.Gosched`?
+## Why are you using `runtime.Gosched`?
 
 - Sadly, it is the only clean way to release the scheduler in a tight loop, Go doesn't provide any other way to yield,
 `time.Sleep` causes random allocations at times.
 [`sync/atomic.Value`](https://github.com/golang/go/blob/master/src/sync/atomic/value.go#L57) has access to internal
 funcs which can control the scheduler, however user code can't do that.
 
-### Isn't using a spinlock bad for the CPU?
+## Isn't using a spinlock bad for the CPU?
 
 - Yes and no, using the spinlock and few sleeps in the code makes it very efficient even under idle conditions.
 
-## License
+# License
 
-Apache v2.0 (see [LICENSE](https://github.com/OneOfOne/lfchan/blob/master/LICENSE) file).
-
-Copyright 2016-2016 Ahmed <[OneOfOne](https://github.com/OneOfOne/)> W.
-
-	Licensed under the Apache License, Version 2.0 (the "License");
-	you may not use this file except in compliance with the License.
-	You may obtain a copy of the License at
-
-		http://www.apache.org/licenses/LICENSE-2.0
-
-	Unless required by applicable law or agreed to in writing, software
-	distributed under the License is distributed on an "AS IS" BASIS,
-	WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-	See the License for the specific language governing permissions and
-	limitations under the License.
+This project is released under the Apache v2. licence. See [LICENCE](LICENCE) for more details.
