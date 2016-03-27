@@ -49,6 +49,18 @@ PASS
 ok      github.com/OneOfOne/lfchan      39.461s
 ```
 
+## FAQ
+### Why are you using `runtime.Gosched`?
+
+- Sadly, it is the only clean way to release the scheduler in a tight loop, Go doesn't provide any other way to yield,
+`time.Sleep` causes random allocations at times.
+[`sync/atomic.Value`](https://github.com/golang/go/blob/master/src/sync/atomic/value.go#L57) has access to internal
+funcs which can control the scheduler, however user code can't do that.
+
+### Isn't using a spinlock bad for the CPU?
+
+- Yes and no, thanks to `runtime.Gosched` usage in my tight loops, lfchan actually uses less CPU than std chans.
+
 ## License
 
 Apache v2.0 (see [LICENSE](https://github.com/OneOfOne/lfchan/blob/master/LICENSE) file).
