@@ -17,18 +17,20 @@ func init() {
 
 func TestLFChan(t *testing.T) {
 	ch := New()
-	go func() {
-		for i := 0; i < 100; i++ {
-			ch.Send(i, true)
+	var want, got int
+	for i := 0; i < 100; i++ {
+		go ch.Send(i, true)
+		want += i
+	}
+	for i := 0; i < 100; i++ {
+		v, ok := ch.Recv(true)
+		if !ok {
+			t.Fatal("!ok")
 		}
-		ch.Close()
-	}()
-	var i int
-	for v, ok := ch.Recv(true); ok && v != nil; v, ok = ch.Recv(true) {
-		if v.(int) != i {
-			t.Fatalf("wanted %v, got %v", i, v)
-		}
-		i++
+		got += v.(int)
+	}
+	if want != got {
+		t.Fatalf("wanted %v, got %v", want, got)
 	}
 }
 
