@@ -120,7 +120,7 @@ func (ch Chan) Len() int { return int(atomic.LoadUint32(&ch.slen) - atomic.LoadU
 
 // SelectSend sends v to the first available channel, if block is true, it blocks until a channel a accepts the value.
 // returns false if all channels were full and block is false.
-func SelectSend(block bool, v interface{}, chans ...Chan) bool {
+func SelectSend(block bool, v interface{}, chans ...Sender) bool {
 	for {
 		for i := range chans {
 			if ok := chans[i].Send(v, false); ok {
@@ -136,7 +136,7 @@ func SelectSend(block bool, v interface{}, chans ...Chan) bool {
 
 // SelectRecv returns the first available value from chans, if block is true, it blocks until a value is available.
 // returns nil, false if all channels were empty and block is false.
-func SelectRecv(block bool, chans ...Chan) (interface{}, bool) {
+func SelectRecv(block bool, chans ...Receiver) (interface{}, bool) {
 	for {
 		for i := range chans {
 			if v, ok := chans[i].Recv(false); ok {
@@ -156,20 +156,8 @@ type SendOnly struct{ c Chan }
 // Send is an alias for Chan.Send.
 func (so SendOnly) Send(v interface{}, block bool) bool { return so.c.Send(v, block) }
 
-// SelectSendOnly sends v to the first available channel, if block is true, it blocks until a channel a accepts the value.
-// returns false if all channels were full and block is false.
-func SelectSendOnly(block bool, v interface{}, chans ...SendOnly) bool {
-	for {
-		for i := range chans {
-			if ok := chans[i].Send(v, false); ok {
-				return ok
-			}
-		}
-		if !block {
-			return false
-		}
-		pause(1)
-	}
+type Sender interface {
+	Send(v interface{}, block bool) bool
 }
 
 // RecvOnly is a receive-only channel.
@@ -178,20 +166,15 @@ type RecvOnly struct{ c Chan }
 // Recv is an alias for Chan.Recv.
 func (ro RecvOnly) Recv(block bool) (interface{}, bool) { return ro.c.Recv(block) }
 
-// SelectRecvOnly returns the first available value from chans, if block is true, it blocks until a value is available.
-// returns nil, false if all channels were empty and block is false.
-func SelectRecvOnly(block bool, chans ...RecvOnly) (interface{}, bool) {
-	for {
-		for i := range chans {
-			if v, ok := chans[i].Recv(false); ok {
-				return v, ok
-			}
-		}
-		if !block {
-			return nilValue, false
-		}
-		pause(1)
-	}
+type Receiver interface {
+	Recv(block bool) (interface{}, bool)
 }
 
 func pause(p time.Duration) { time.Sleep(time.Millisecond * p) }
+
+var (
+	_ Sender   = (*Chan)(nil)
+	_ Sender   = (*SendOnly)(nil)
+	_ Receiver = (*Chan)(nil)
+	_ Receiver = (*RecvOnly)(nil)
+)

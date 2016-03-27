@@ -40,12 +40,20 @@ func TestSelect(t *testing.T) {
 		chs[i] = New()
 	}
 	for i := range chs {
-		if !SelectSend(false, i, chs[:]...) {
+		var senders [100]Sender
+		for i := range chs {
+			senders[i] = chs[i]
+		}
+		if !SelectSend(false, i, senders[:]...) {
 			t.Fatalf("couldn't send %d", i)
 		}
 	}
 	for i := range chs {
-		if v, ok := SelectRecv(false, chs[:]...); !ok || v != i {
+		var recvs [100]Receiver
+		for i := range chs {
+			recvs[i] = chs[i]
+		}
+		if v, ok := SelectRecv(false, recvs[:]...); !ok || v != i {
 			t.Fatalf("wanted %v, got %v", i, v)
 		}
 	}
