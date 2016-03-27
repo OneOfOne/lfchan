@@ -61,10 +61,6 @@ func TestFIFO(t *testing.T) {
 		}
 		ch.Close()
 	}()
-	for ch.Len() != ch.Cap() {
-		time.Sleep(time.Microsecond) // fill the queue
-	}
-	t.Logf("chan len: %v", ch.Len())
 	for i := 0; i < N; i++ {
 		v, ok := ch.Recv(true)
 		if !ok {
@@ -74,6 +70,40 @@ func TestFIFO(t *testing.T) {
 			t.Fatalf("wanted %d, got %d", i, v)
 		}
 	}
+}
+
+// needs to run with -count 100 to trigger
+func TestLen(t *testing.T) {
+	const N = 100000
+	ch := NewSize(100)
+	var wg sync.WaitGroup
+	wg.Add(N * 2)
+	go func() {
+		for i := 0; i < N; i++ {
+			go func() {
+				defer wg.Done()
+				v, ok := ch.Recv(true)
+				if !ok {
+					t.Fatal("!ok")
+				}
+				if ch.Len() == -1 {
+					t.Fatalf("ch.Len() == -1: %v", v)
+				}
+			}()
+		}
+	}()
+
+	go func() {
+		for i := 0; i < N; i++ {
+			go func(i int) {
+				defer wg.Done()
+				ch.Send(i, true)
+			}(i)
+		}
+	}()
+
+	wg.Wait()
+	ch.Close()
 }
 
 func TestLFCPU(t *testing.T) {
