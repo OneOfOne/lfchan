@@ -38,9 +38,6 @@ func NewSize(sz int) Chan {
 
 // Send adds v to the buffer of the channel and returns true, if the channel is closed it returns false
 func (ch Chan) Send(v interface{}, block bool) bool {
-	if v == nilValue {
-		panic("can't send an empty value")
-	}
 	if !block && ch.Len() == ch.Cap() {
 		return false
 	}

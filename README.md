@@ -58,7 +58,7 @@ func main() {
 
 ```
 
-**Warning** currently, it doesn't handle zero value primitve types correctly,
+**Warning** currently, typed channels can't handle zero value primitve types correctly,
 for example it can't handle sending 0 on an int channel.
 
 ## Benchmark
