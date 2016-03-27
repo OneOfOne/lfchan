@@ -10,8 +10,9 @@ type innerChan struct {
 	q       []AtomicValue
 	sendIdx uint32
 	recvIdx uint32
-	len     int32
-	die     int32
+	slen    uint32
+	rlen    uint32
+	die     uint32
 }
 
 // Chan is a lock free channel that supports concurrent channel operations.
@@ -52,7 +53,7 @@ func (ch Chan) Send(v interface{}, block bool) bool {
 		}
 		i := atomic.AddUint32(&ch.sendIdx, 1)
 		if ch.q[i%ln].CompareAndSwap(nilValue, v) {
-			atomic.AddInt32(&ch.len, 1)
+			atomic.AddUint32(&ch.slen, 1)
 			return true
 		}
 		if block {
@@ -84,7 +85,7 @@ func (ch Chan) Recv(block bool) (interface{}, bool) {
 		}
 		i := atomic.AddUint32(&ch.recvIdx, 1)
 		if v := ch.q[i%ln].Swap(nilValue); v != nilValue {
-			atomic.AddInt32(&ch.len, -1)
+			atomic.AddUint32(&ch.rlen, 1)
 			return v, true
 		}
 		if block {
@@ -106,16 +107,16 @@ func (ch Chan) SendOnly() SendOnly { return SendOnly{ch} }
 func (ch Chan) RecvOnly() RecvOnly { return RecvOnly{ch} }
 
 // Close marks the channel as closed
-func (ch Chan) Close() { atomic.StoreInt32(&ch.die, 1) }
+func (ch Chan) Close() { atomic.StoreUint32(&ch.die, 1) }
 
 // Closed returns true if the channel have been closed
-func (ch Chan) Closed() bool { return atomic.LoadInt32(&ch.die) == 1 }
+func (ch Chan) Closed() bool { return atomic.LoadUint32(&ch.die) == 1 }
 
 // Cap returns the size of the internal queue
 func (ch Chan) Cap() int { return len(ch.q) }
 
 // Len returns the number of elements queued
-func (ch Chan) Len() int { return int(atomic.LoadInt32(&ch.len)) }
+func (ch Chan) Len() int { return int(atomic.LoadUint32(&ch.slen) - atomic.LoadUint32(&ch.rlen)) }
 
 // SelectSend sends v to the first available channel, if block is true, it blocks until a channel a accepts the value.
 // returns false if all channels were full and block is false.

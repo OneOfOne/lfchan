@@ -86,8 +86,8 @@ func TestLen(t *testing.T) {
 				if !ok {
 					t.Fatal("!ok")
 				}
-				if ch.Len() == -1 {
-					t.Fatalf("ch.Len() == -1: %v", v)
+				if ln := ch.Len(); ln < 0 {
+					t.Fatalf("ch.Len() == %d: %v", ln, v)
 				}
 			}()
 		}
