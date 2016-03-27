@@ -41,8 +41,15 @@ func (ch Chan) Send(v interface{}, block bool) bool {
 	if !block && ch.Len() == ch.Cap() {
 		return false
 	}
-	ncpu, ln, cnt := uint32(runtime.NumCPU()), uint32(len(ch.q)), uint32(0)
+	ncpu, ln, cnt := uint32(runtime.GOMAXPROCS(0)), uint32(len(ch.q)), uint32(0)
 	for !ch.Closed() {
+		if ch.Len() == ch.Cap() {
+			if !block {
+				return false
+			}
+			runtime.Gosched()
+			continue
+		}
 		i := atomic.AddUint32(&ch.sendIdx, 1)
 		if ch.q[i%ln].CompareAndSwap(nilValue, v) {
 			atomic.AddInt32(&ch.len, 1)
@@ -66,8 +73,15 @@ func (ch Chan) Recv(block bool) (interface{}, bool) {
 	if !block && ch.Len() == 0 { // fast path
 		return nilValue, false
 	}
-	ncpu, ln, cnt := uint32(runtime.NumCPU()), uint32(len(ch.q)), uint32(0)
+	ncpu, ln, cnt := uint32(runtime.GOMAXPROCS(0)), uint32(len(ch.q)), uint32(0)
 	for !ch.Closed() || ch.Len() > 0 {
+		if ch.Len() == 0 {
+			if !block {
+				return nil, false
+			}
+			runtime.Gosched()
+			continue
+		}
 		i := atomic.AddUint32(&ch.recvIdx, 1)
 		if v := ch.q[i%ln].Swap(nilValue); v != nilValue {
 			atomic.AddInt32(&ch.len, -1)

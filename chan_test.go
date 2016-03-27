@@ -51,6 +51,31 @@ func TestSelect(t *testing.T) {
 	}
 }
 
+func TestFIFO(t *testing.T) {
+	const N = 10000
+	ch := NewSize(100)
+
+	go func() {
+		for i := 0; i < N; i++ {
+			ch.Send(i, true)
+		}
+		ch.Close()
+	}()
+	for ch.Len() != ch.Cap() {
+		time.Sleep(time.Microsecond) // fill the queue
+	}
+	t.Logf("chan len: %v", ch.Len())
+	for i := 0; i < N; i++ {
+		v, ok := ch.Recv(true)
+		if !ok {
+			t.Fatal("!ok")
+		}
+		if v.(int) != i {
+			t.Fatalf("wanted %d, got %d", i, v)
+		}
+	}
+}
+
 func TestLFCPU(t *testing.T) {
 	if !*timeCpu {
 		t.SkipNow()
