@@ -34,7 +34,7 @@ func main() {
 		}
 	}
 	if err := os.MkdirAll(typName, 0755); err != nil {
-		log.Fatalf("os.MkdirAll(%s, 0755): %v", typName, err)
+		log.Fatalf("os.MkdirAll(%q, 0755): %v", typName, err)
 	}
 	repl := strings.NewReplacer("interface{}", typ, "package lfchan", "package "+filepath.Base(typName))
 	log.Printf("outputting to %s", typName)

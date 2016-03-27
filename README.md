@@ -36,7 +36,7 @@ func main() {
 go run "$GOPATH/src/github.com/OneOfOne/lfchan/gen.go" type [pkgName]
 
 # example
-go run "$GOPATH/src/github.com/OneOfOne/lfchan/gen.go" *node nodeChan
+go run "$GOPATH/src/github.com/OneOfOne/lfchan/gen.go" *Node nodeChan
 
 ```
 
@@ -52,14 +52,20 @@ import (
 func main() {
 	ch := nodeChan.New() // or
 	// ch := nodeChan.NewSize(10) // buffered channel
-	go ch.Send(&node{1}, true)
-	fmt.Printf("%#+v", ch.Recv(true))
+	go ch.Send(&Node{1}, true)
+	for n, ok := ch.Recv(true); ok; n, ok = ch.Recv(true) {
+		// handle n
+	}
 }
 
 ```
 
 **Warning** currently, typed channels can't handle zero value primitve types correctly,
 for example it can't handle sending 0 on an int channel.
+
+## Known issues
+
+- Under high concurrency, ch.Len() can return -1 (issue #2).
 
 ## Benchmark
 ```bash
@@ -82,6 +88,7 @@ ok      github.com/OneOfOne/lfchan      39.461s
 ```
 
 ## FAQ
+
 ### Why are you using `runtime.Gosched`?
 
 - Sadly, it is the only clean way to release the scheduler in a tight loop, Go doesn't provide any other way to yield,
@@ -91,7 +98,7 @@ funcs which can control the scheduler, however user code can't do that.
 
 ### Isn't using a spinlock bad for the CPU?
 
-- Yes and no, thanks to `runtime.Gosched` usage in my tight loops, lfchan actually uses less CPU than std chans.
+- Yes and no, using the spinlock and few sleeps in the code makes it very efficient even under idle conditions.
 
 ## License
 
