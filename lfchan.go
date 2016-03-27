@@ -3,6 +3,7 @@ package lfchan
 import (
 	"runtime"
 	"sync/atomic"
+	"time"
 )
 
 type innerChan struct {
@@ -42,7 +43,6 @@ func (ch Chan) Send(v interface{}, block bool) bool {
 	}
 	ncpu, ln, cnt := uint32(runtime.NumCPU()), uint32(len(ch.q)), uint32(0)
 	for !ch.Closed() {
-
 		i := atomic.AddUint32(&ch.sendIdx, 1)
 		if ch.q[i%ln].CompareAndSwap(nil, v) {
 			atomic.AddInt32(&ch.len, 1)
@@ -50,9 +50,7 @@ func (ch Chan) Send(v interface{}, block bool) bool {
 		}
 		if block {
 			if i%(ncpu*100) == 0 {
-				for i := uint32(0); i < ncpu; i++ {
-					runtime.Gosched()
-				}
+				pause(1)
 			}
 		} else if cnt++; cnt == ln {
 			break
@@ -77,9 +75,7 @@ func (ch Chan) Recv(block bool) (interface{}, bool) {
 		}
 		if block {
 			if i%(ncpu*100) == 0 {
-				for i := uint32(0); i < ncpu; i++ {
-					runtime.Gosched()
-				}
+				pause(1)
 			}
 		} else if cnt++; cnt == ln {
 			break
@@ -119,7 +115,7 @@ func SelectSend(block bool, v interface{}, chans ...Chan) bool {
 		if !block {
 			return false
 		}
-		runtime.Gosched()
+		pause(1)
 	}
 }
 
@@ -135,7 +131,7 @@ func SelectRecv(block bool, chans ...Chan) (interface{}, bool) {
 		if !block {
 			return nil, false
 		}
-		runtime.Gosched()
+		pause(1)
 	}
 }
 
@@ -157,7 +153,7 @@ func SelectSendOnly(block bool, v interface{}, chans ...SendOnly) bool {
 		if !block {
 			return false
 		}
-		runtime.Gosched()
+		pause(1)
 	}
 }
 
@@ -179,6 +175,8 @@ func SelectRecvOnly(block bool, chans ...RecvOnly) (interface{}, bool) {
 		if !block {
 			return nil, false
 		}
-		runtime.Gosched()
+		pause(1)
 	}
 }
+
+func pause(p time.Duration) { time.Sleep(time.Millisecond * p) }

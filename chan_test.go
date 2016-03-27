@@ -1,18 +1,21 @@
 package lfchan
 
 import (
+	"flag"
 	"log"
 	"sync"
 	"sync/atomic"
 	"testing"
+	"time"
 )
+
+var timeCpu = flag.Bool("timeCpu", false, "internal")
 
 func init() {
 	log.SetFlags(log.Lshortfile)
 }
 
 func TestLFChan(t *testing.T) {
-	t.SkipNow()
 	ch := New()
 	go func() {
 		for i := 0; i < 100; i++ {
@@ -22,7 +25,6 @@ func TestLFChan(t *testing.T) {
 	}()
 	var i int
 	for v, ok := ch.Recv(true); ok && v != nil; v, ok = ch.Recv(true) {
-		t.Log(i, v, ok)
 		if v.(int) != i {
 			t.Fatalf("wanted %v, got %v", i, v)
 		}
@@ -44,6 +46,40 @@ func TestSelect(t *testing.T) {
 		if v, ok := SelectRecv(false, chs[:]...); !ok || v != i {
 			t.Fatalf("wanted %v, got %v", i, v)
 		}
+	}
+}
+
+func TestLFCPU(t *testing.T) {
+	if !*timeCpu {
+		t.SkipNow()
+	}
+	ch := NewSize(1)
+	go func() {
+		for i := 0; i < 10; i++ {
+			ch.Send(i, true)
+			time.Sleep(time.Second)
+		}
+		ch.Close()
+	}()
+	for v, ok := ch.Recv(true); ok && v != nil; v, ok = ch.Recv(true) {
+		t.Log(v)
+	}
+}
+
+func TestStdCPU(t *testing.T) {
+	if !*timeCpu {
+		t.SkipNow()
+	}
+	ch := make(chan interface{}, 1)
+	go func() {
+		for i := 0; i < 10; i++ {
+			ch <- i
+			time.Sleep(time.Second)
+		}
+		close(ch)
+	}()
+	for v := range ch {
+		t.Log(v)
 	}
 }
 
