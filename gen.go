@@ -70,7 +70,7 @@ func main() {
 			replaces = append(replaces, "import (", fmt.Sprintf("import (\n\t%q\n", importPkg))
 		}
 	} else {
-		fnamePre = strings.ToLower(typ) + "_"
+		fnamePre = replQ.Replace(strings.ToLower(typ)) + "_"
 	}
 
 	if typName == "" {
@@ -182,10 +182,15 @@ func TestChan(t *testing.T) {
 	if testing.Short() {
 		N = 1000
 	}
+	go ch.Send(zero, true)
+	if v, ok := ch.Recv(true); !ok || !reflect.DeepEqual(v, zero) {
+		t.Fatal("!ok || v != zero")
+	}
 	for {
 		var ok bool
 		if iv, ok = quick.Value(typ, rand.New(rand.NewSource(43))); !ok {
-			t.SkipNow()
+			t.Logf("!ok creating a random value")
+			return
 		}
 		if iv.Kind() == reflect.Ptr && iv.IsNil() {
 			continue
@@ -194,13 +199,12 @@ func TestChan(t *testing.T) {
 	}
 	rv, ok := iv.Interface().(interface{})
 	if !ok {
-		t.SkipNow()
+		t.Fatal("wrong value type")
 	}
 	go func() {
 		for i := 0; i < N; i++ {
 			ch.Send(rv, true)
 		}
-		ch.Send(zero, true)
 		ch.Close()
 	}()
 	for i := 0; i < N; i++ {
@@ -211,9 +215,6 @@ func TestChan(t *testing.T) {
 		if !reflect.DeepEqual(v, rv) {
 			t.Fatalf("wanted %%v, got %%v", rv, v)
 		}
-	}
-	if v, ok := ch.Recv(true); !ok || !reflect.DeepEqual(v, zero){
-		t.Fatal("!ok || v != zero")
 	}
 }
 `
