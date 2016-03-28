@@ -119,19 +119,26 @@ for example it can't handle sending 0 on an int channel</strike> Fixed.
 - gen.go can't handle maps to non-native types.
 
 # Benchmark
+
 ```bash
+# Intel(R) Core(TM) i7-4790 CPU @ 3.60GHz
+# Linux 4.4.5 x86_64
+
+➜ go test -bench=. -benchmem  -run NONE -cpu 1,4,8 -benchtime 10s
 # ch := NewSize(100)
-BenchmarkLFChan         50000000               344 ns/op               8 B/op          1 allocs/op
-BenchmarkLFChan-4       50000000               275 ns/op               8 B/op          1 allocs/op
-BenchmarkLFChan-8       50000000               298 ns/op               8 B/op          1 allocs/op
+BenchmarkLFChan         100000000              190 ns/op              40 B/op          4 allocs/op
+BenchmarkLFChan-4       100000000              208 ns/op              40 B/op          4 allocs/op
+BenchmarkLFChan-8       100000000              149 ns/op              40 B/op          4 allocs/op
 
 # ch := make(chan interface{}, 100)
-BenchmarkChan           50000000               382 ns/op               8 B/op          1 allocs/op
-BenchmarkChan-4         50000000               389 ns/op               8 B/op          1 allocs/op
-BenchmarkChan-8         30000000               500 ns/op               8 B/op          1 allocs/op
+BenchmarkChan           100000000              100 ns/op               8 B/op          1 allocs/op
+BenchmarkChan-4         50000000               252 ns/op               8 B/op          1 allocs/op
+BenchmarkChan-8         50000000               330 ns/op               8 B/op          1 allocs/op
 PASS
-ok      github.com/OneOfOne/lfchan      128.469s
+ok      github.com/OneOfOne/lfchan      95.414s
 ```
+
+**check** [issue #3](https://github.com/OneOfOne/lfchan/issues/3) for more benchmarks and updates.
 
 # FAQ
 
