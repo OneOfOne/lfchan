@@ -3,7 +3,6 @@ package lfchan
 import (
 	"flag"
 	"sync"
-	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -144,38 +143,31 @@ func TestStdCPU(t *testing.T) {
 }
 
 func BenchmarkLFChan(b *testing.B) {
-	var cnt uint64
 	ch := NewSize(100)
-	var total uint64
 	b.RunParallel(func(pb *testing.PB) {
-		var wg sync.WaitGroup
+		var cnt uint64
+		var total uint64
 		for pb.Next() {
-			ch.Send(atomic.AddUint64(&cnt, 1), true)
-			wg.Add(1)
-			go func() {
-				v, _ := ch.Recv(true)
-				atomic.AddUint64(&total, v.(uint64))
-				wg.Done()
-			}()
+			ch.Send(cnt, true)
+			v, _ := ch.Recv(true)
+			total += v.(uint64)
+			cnt++
 		}
-		wg.Wait()
 	})
 }
 
 func BenchmarkChan(b *testing.B) {
-	var cnt uint64
 	ch := make(chan interface{}, 100)
-	var total uint64
 	b.RunParallel(func(pb *testing.PB) {
-		var wg sync.WaitGroup
 		for pb.Next() {
-			wg.Add(1)
-			ch <- atomic.AddUint64(&cnt, 1)
-			go func() {
-				atomic.AddUint64(&total, (<-ch).(uint64))
-				wg.Done()
-			}()
+			var cnt uint64
+			var total uint64
+			for pb.Next() {
+				ch <- cnt
+				v := <-ch
+				total += v.(uint64)
+				cnt++
+			}
 		}
-		wg.Wait()
 	})
 }

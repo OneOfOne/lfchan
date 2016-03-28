@@ -42,7 +42,7 @@ func (ch Chan) Send(v interface{}, block bool) bool {
 	if !block && ch.Len() == ch.Cap() {
 		return false
 	}
-	ncpu, ln, cnt := uint32(runtime.GOMAXPROCS(0)), uint32(len(ch.q)), uint32(0)
+	ln, cnt := uint32(len(ch.q)), uint32(0)
 	for !ch.Closed() {
 		if ch.Len() == ch.Cap() {
 			if !block {
@@ -57,7 +57,7 @@ func (ch Chan) Send(v interface{}, block bool) bool {
 			return true
 		}
 		if block {
-			if i%(ncpu*100) == 0 {
+			if i%250 == 0 {
 				pause(1)
 			}
 		} else if cnt++; cnt == ln {
@@ -74,7 +74,7 @@ func (ch Chan) Recv(block bool) (interface{}, bool) {
 	if !block && ch.Len() == 0 { // fast path
 		return nilValue, false
 	}
-	ncpu, ln, cnt := uint32(runtime.GOMAXPROCS(0)), uint32(len(ch.q)), uint32(0)
+	ln, cnt := uint32(len(ch.q)), uint32(0)
 	for !ch.Closed() || ch.Len() > 0 {
 		if ch.Len() == 0 {
 			if !block {
@@ -89,7 +89,7 @@ func (ch Chan) Recv(block bool) (interface{}, bool) {
 			return v, true
 		}
 		if block {
-			if i%(ncpu*100) == 0 {
+			if i%250 == 0 {
 				pause(1)
 			}
 		} else if cnt++; cnt == ln {
