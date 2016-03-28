@@ -2,6 +2,7 @@ package lfchan
 
 import (
 	"flag"
+	"runtime"
 	"sync"
 	"testing"
 	"time"
@@ -76,7 +77,10 @@ func TestFIFO(t *testing.T) {
 
 // needs to run with -count 100 to trigger
 func TestLen(t *testing.T) {
-	const N = 100000
+	var N = 10000
+	if runtime.GOMAXPROCS(0) < 4 { // it gets slow
+		N = 1000
+	}
 	ch := NewSize(100)
 	var wg sync.WaitGroup
 	wg.Add(N * 2)

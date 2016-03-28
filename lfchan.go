@@ -47,7 +47,7 @@ func (ch Chan) Send(v interface{}, block bool) bool {
 	for !ch.Closed() {
 		if ch.Len() == ch.Cap() {
 			if !block {
-				return false
+				break
 			}
 			runtime.Gosched()
 			continue
@@ -76,10 +76,10 @@ func (ch Chan) Recv(block bool) (interface{}, bool) {
 		return zeroValue, false
 	}
 	ln, cnt := uint32(len(ch.q)), uint32(0)
-	for !ch.Closed() || ch.Len() > 0 {
-		if ch.Len() == 0 {
+	for chln := ch.Len(); !ch.Closed() || chln > 0; chln = ch.Len() {
+		if chln == 0 {
 			if !block {
-				return zeroValue, false
+				break
 			}
 			runtime.Gosched()
 			continue
