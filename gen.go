@@ -20,13 +20,14 @@ import (
 
 var (
 	files = [...]string{
-		"$GOPATH/src/github.com/OneOfOne/lfchan/avalue.go",
 		"$GOPATH/src/github.com/OneOfOne/lfchan/lfchan.go",
 	}
+
 	cwd = func() string { v, _ := os.Getwd(); return filepath.Base(v) }()
 
 	isMain = flag.Bool("main", false, `should the files be under package main, only used if -o is set to ".".
 	if not set then they will be under currentDirName.`)
+	genTest = flag.Bool("t", false, "generate a test")
 )
 
 func init() {
@@ -143,12 +144,15 @@ func main() {
 		}
 		of.Close()
 	}
-	if err := ioutil.WriteFile(filepath.Join(pkgName, fnamePre+"chan_test.go"), []byte(repl.Replace(testCode)), 0644); err != nil {
-		log.Fatal(err)
-	}
-	out, err := exec.Command("go", "test", "-run=Chan", "./...").CombinedOutput()
-	if err != nil {
-		log.Fatalf("error running tests: %s %v", out, err)
+
+	if *genTest {
+		if err := ioutil.WriteFile(filepath.Join(pkgName, fnamePre+"chan_test.go"), []byte(repl.Replace(testCode)), 0644); err != nil {
+			log.Fatal(err)
+		}
+		out, err := exec.Command("go", "test", "-run=Chan", "./...").CombinedOutput()
+		if err != nil {
+			log.Fatalf("error running tests: %s %v", out, err)
+		}
 	}
 }
 
@@ -175,7 +179,7 @@ func TestChan(t *testing.T) {
 	var (
 		N = 10000
 		iv reflect.Value
-		typ  = reflect.TypeOf(nilValue)
+		typ  = reflect.TypeOf(zeroValue)
 		zero = reflect.Zero(typ).Interface().(interface{})
 		ch = NewSize(100)
 	)
@@ -201,6 +205,7 @@ func TestChan(t *testing.T) {
 	if !ok {
 		t.Fatal("wrong value type")
 	}
+	t.Logf("test value (%T): %v", rv, rv)
 	go func() {
 		for i := 0; i < N; i++ {
 			ch.Send(rv, true)

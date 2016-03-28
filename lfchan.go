@@ -4,6 +4,7 @@ import (
 	"runtime"
 	"sync/atomic"
 	"time"
+	"unsafe"
 )
 
 type innerChan struct {
@@ -72,13 +73,13 @@ func (ch Chan) Send(v interface{}, block bool) bool {
 // the buffer is empty, it will return nil, false
 func (ch Chan) Recv(block bool) (interface{}, bool) {
 	if !block && ch.Len() == 0 { // fast path
-		return nilValue, false
+		return zeroValue, false
 	}
 	ln, cnt := uint32(len(ch.q)), uint32(0)
 	for !ch.Closed() || ch.Len() > 0 {
 		if ch.Len() == 0 {
 			if !block {
-				return nilValue, false
+				return zeroValue, false
 			}
 			runtime.Gosched()
 			continue
@@ -97,7 +98,7 @@ func (ch Chan) Recv(block bool) (interface{}, bool) {
 		}
 		runtime.Gosched()
 	}
-	return nilValue, false
+	return zeroValue, false
 }
 
 // SendOnly returns a send-only channel.
@@ -144,7 +145,7 @@ func SelectRecv(block bool, chans ...Receiver) (interface{}, bool) {
 			}
 		}
 		if !block {
-			return nilValue, false
+			return zeroValue, false
 		}
 		pause(1)
 	}
@@ -180,3 +181,22 @@ var (
 	_ Receiver = (*Chan)(nil)
 	_ Receiver = (*RecvOnly)(nil)
 )
+
+var zeroValue interface{}
+
+type aValue struct {
+	v interface{}
+}
+
+func (a *aValue) CompareAndSwapIfNil(newVal interface{}) bool {
+	x := unsafe.Pointer(&a.v)
+	return atomic.CompareAndSwapPointer((*unsafe.Pointer)(atomic.LoadPointer(&x)), nil, unsafe.Pointer(&newVal))
+}
+
+func (a *aValue) SwapWithNil() (interface{}, bool) {
+	x := unsafe.Pointer(&a.v)
+	if v := atomic.SwapPointer((*unsafe.Pointer)(atomic.LoadPointer(&x)), nil); v != nil {
+		return *(*interface{})(v), true
+	}
+	return zeroValue, false
+}
