@@ -1,4 +1,4 @@
-# lfchan [![GoDoc](http://godoc.org/github.com/OneOfOne/lfchan?status.svg)](http://godoc.org/github.com/OneOfOne/lfchan) [![Build Status](https://travis-ci.org/OneOfOne/lfchan.svg?branch=master)](https://travis-ci.org/OneOfOne/lfchan)
+# lfchan [![GoDoc](http://godoc.org/github.com/OneOfOne/lfchan?status.svg)](http://godoc.org/github.com/OneOfOne/lfchan) [![Build Status](https://travis-ci.org/OneOfOne/lfchan.svg?branch=master)](https://travis-ci.org/OneOfOne/lfchan) [![Go Report Card](https://goreportcard.com/badge/github.com/OneOfOne/lfchan)](https://goreportcard.com/report/github.com/OneOfOne/lfchan)
 --
 
 A scalable lock-free channel.
@@ -33,24 +33,30 @@ func main() {
 
 ## Generate the package:
 ``` bash
-go run "$GOPATH/src/github.com/OneOfOne/lfchan/gen.go" type [pkgName]
+go run "$GOPATH/src/github.com/OneOfOne/lfchan/gen.go" type [pkgName or . to embed the chan in the current package]
 
 # primitve type
 go run "$GOPATH/src/github.com/OneOfOne/lfchan/gen.go" string internal/stringChan
 
 # or for using a non-native type
-
 go run "$GOPATH/src/github.com/OneOfOne/lfchan/gen.go" github.com/OneOfOne/cmap.CMap internal/cmapChan
+
+go run "$GOPATH/src/github.com/OneOfOne/lfchan/gen.go" github.com/OneOfOne/cmap.CMap
 
 ```
 
 ## Use it in your code:
 
+### typed sub package
+
 ```go
+package main
+
+// go run "$GOPATH/src/github.com/OneOfOne/lfchan/gen.go" string internal/stringChan
+
 import (
 	"fmt"
 
-	"github.com/OneOfOne/cmap"
 	"github.com/YOU/internal/stringChan"
 )
 
@@ -69,6 +75,37 @@ func main() {
 
 ```
 
+### embed the type directly
+
+```go
+package main
+
+// go run "$GOPATH/src/github.com/OneOfOne/lfchan/gen.go" "[]*node" .
+
+import (
+	"fmt"
+)
+
+type node struct {
+	v int
+}
+
+func main() {
+	// notice how for embeded types the new func is called "new[Size]{TypeName}Chan()
+	ch := newNodeChan() // or
+	// ch := newSizeNodeChan(10) // buffered channel
+	go func() {
+		for i := 0; i < 10; i++ {
+			ch.Send([]*Node{{i}, {i*i}}, true)
+		}
+	}()
+	for ns, ok := ch.Recv(true); ok; ns, ok = ch.Recv(true) {
+		for i, n := range ns {
+			fmt.Println(i, n.v)
+		}
+	}
+}
+```
 
 
 # Known issues

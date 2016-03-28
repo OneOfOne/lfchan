@@ -156,6 +156,7 @@ type SendOnly struct{ c Chan }
 // Send is an alias for Chan.Send.
 func (so SendOnly) Send(v interface{}, block bool) bool { return so.c.Send(v, block) }
 
+// Sender represents a Chan or SendOnly.
 type Sender interface {
 	Send(v interface{}, block bool) bool
 }
@@ -166,6 +167,7 @@ type RecvOnly struct{ c Chan }
 // Recv is an alias for Chan.Recv.
 func (ro RecvOnly) Recv(block bool) (interface{}, bool) { return ro.c.Recv(block) }
 
+// Receiver represents a Chan or RecvOnly.
 type Receiver interface {
 	Recv(block bool) (interface{}, bool)
 }

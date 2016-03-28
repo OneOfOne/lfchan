@@ -2,18 +2,13 @@ package lfchan
 
 import (
 	"flag"
-	"log"
 	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
 )
 
-var timeCpu = flag.Bool("timeCpu", false, "internal")
-
-func init() {
-	log.SetFlags(log.Lshortfile)
-}
+var timeCPU = flag.Bool("timeCpu", false, "internal")
 
 func TestLFChan(t *testing.T) {
 	ch := New()
@@ -115,7 +110,7 @@ func TestLen(t *testing.T) {
 }
 
 func TestLFCPU(t *testing.T) {
-	if !*timeCpu {
+	if !*timeCPU {
 		t.SkipNow()
 	}
 	ch := NewSize(1)
@@ -132,7 +127,7 @@ func TestLFCPU(t *testing.T) {
 }
 
 func TestStdCPU(t *testing.T) {
-	if !*timeCpu {
+	if !*timeCPU {
 		t.SkipNow()
 	}
 	ch := make(chan interface{}, 1)
