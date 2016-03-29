@@ -2,7 +2,6 @@ package lfchan
 
 import (
 	"flag"
-	"runtime"
 	"sync"
 	"testing"
 	"time"
@@ -62,7 +61,6 @@ func TestFIFO(t *testing.T) {
 		for i := 0; i < N; i++ {
 			ch.Send(i, true)
 		}
-		ch.Close()
 	}()
 	for i := 0; i < N; i++ {
 		v, ok := ch.Recv(true)
@@ -73,14 +71,12 @@ func TestFIFO(t *testing.T) {
 			t.Fatalf("wanted %d, got %d", i, v)
 		}
 	}
+	t.Logf("sendIdx: %d, recvIdx: %d", ch.sendIdx, ch.recvIdx)
 }
 
 // needs to run with -count 100 to trigger
 func TestLen(t *testing.T) {
-	var N = 10000
-	if runtime.GOMAXPROCS(0) < 4 { // it gets slow
-		N = 1000
-	}
+	const N = 10000
 	ch := NewSize(100)
 	var wg sync.WaitGroup
 	wg.Add(N * 2)
@@ -110,6 +106,7 @@ func TestLen(t *testing.T) {
 
 	wg.Wait()
 	ch.Close()
+	t.Logf("sendIdx: %d, recvIdx: %d", ch.sendIdx, ch.recvIdx)
 }
 
 func TestLFCPU(t *testing.T) {

@@ -7,7 +7,11 @@ import (
 	"unsafe"
 )
 
-var ncpu = runtime.NumCPU()
+var nprocs int
+
+func init() {
+	nprocs = runtime.GOMAXPROCS(0)
+}
 
 type innerChan struct {
 	q       [][]aValue
@@ -28,20 +32,24 @@ func New() Chan {
 	return NewSize(1)
 }
 
-// NewSize creates a buffered channel, with minimum length of 1
+// NewSize creates a buffered channel, with minimum length of 1, may adjust the size to fit better in the internal queue.
 func NewSize(sz int) Chan {
 	if sz < 1 {
 		panic("sz < 1")
 	}
-	n := ncpu
+	n := nprocs
 	if sz < n {
 		n = sz
+	}
+	if sz%n != 0 {
+		sz += (sz % n)
 	}
 	ch := Chan{&innerChan{
 		q:       make([][]aValue, n),
 		sendIdx: ^uint32(0),
 		recvIdx: ^uint32(0),
 	}}
+	//q := make([]aValue, sz/n)
 	for i := range ch.q {
 		ch.q[i] = make([]aValue, sz/n)
 	}
@@ -55,7 +63,7 @@ func (ch Chan) Send(v interface{}, block bool) bool {
 	}
 	qln, ln, cnt := uint32(len(ch.q)), uint32(len(ch.q[0])), uint32(0)
 	for !ch.Closed() {
-		if ch.Len() == ch.Cap() {
+		if ch.Len() == int(ln) {
 			if !block {
 				break
 			}
@@ -63,13 +71,15 @@ func (ch Chan) Send(v interface{}, block bool) bool {
 			continue
 		}
 		i := atomic.AddUint32(&ch.sendIdx, 1)
-		if ch.q[i%qln][i%ln].CompareAndSwapIfNil(v) {
+		qIdx, sIdx := i%qln, i%ln
+		if ch.q[qIdx][sIdx].CompareAndSwapIfNil(v) {
 			atomic.AddUint32(&ch.slen, 1)
 			return true
 		}
 		if block {
-			if i%250 == 0 {
-				pause(1)
+			if i > 0 && qln > 1 && sIdx == 0 {
+				//				log.Println(i, qln, ln, qIdx, sIdx)
+				time.Sleep(time.Millisecond)
 			}
 		} else if cnt++; cnt == ln {
 			break
@@ -95,13 +105,14 @@ func (ch Chan) Recv(block bool) (interface{}, bool) {
 			continue
 		}
 		i := atomic.AddUint32(&ch.recvIdx, 1)
-		if v, ok := ch.q[i%qln][i%ln].SwapWithNil(); ok {
+		qIdx, sIdx := i%qln, i%ln
+		if v, ok := ch.q[qIdx][sIdx].SwapWithNil(); ok {
 			atomic.AddUint32(&ch.rlen, 1)
 			return v, true
 		}
 		if block {
-			if i%250 == 0 {
-				pause(1)
+			if qIdx == ln-1 {
+				time.Sleep(time.Millisecond)
 			}
 		} else if cnt++; cnt == ln {
 			break
@@ -124,7 +135,7 @@ func (ch Chan) Close() { atomic.StoreUint32(&ch.die, 1) }
 func (ch Chan) Closed() bool { return atomic.LoadUint32(&ch.die) == 1 }
 
 // Cap returns the size of the internal queue
-func (ch Chan) Cap() int { return len(ch.q) }
+func (ch Chan) Cap() int { return len(ch.q[0]) * len(ch.q) }
 
 // Len returns the number of elements queued
 func (ch Chan) Len() int { return int(atomic.LoadUint32(&ch.slen) - atomic.LoadUint32(&ch.rlen)) }
@@ -141,7 +152,7 @@ func SelectSend(block bool, v interface{}, chans ...Sender) bool {
 		if !block {
 			return false
 		}
-		pause(1)
+		time.Sleep(time.Millisecond)
 	}
 }
 
@@ -157,7 +168,7 @@ func SelectRecv(block bool, chans ...Receiver) (interface{}, bool) {
 		if !block {
 			return zeroValue, false
 		}
-		pause(1)
+		time.Sleep(time.Millisecond)
 	}
 }
 
@@ -182,8 +193,6 @@ func (ro RecvOnly) Recv(block bool) (interface{}, bool) { return ro.c.Recv(block
 type Receiver interface {
 	Recv(block bool) (interface{}, bool)
 }
-
-func pause(p time.Duration) { time.Sleep(time.Millisecond * p) }
 
 var (
 	_ Sender   = (*Chan)(nil)
