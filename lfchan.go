@@ -7,8 +7,10 @@ import (
 	"unsafe"
 )
 
+var ncpu = runtime.NumCPU()
+
 type innerChan struct {
-	q       []aValue
+	q       [][]aValue
 	sendIdx uint32
 	recvIdx uint32
 	slen    uint32
@@ -31,11 +33,19 @@ func NewSize(sz int) Chan {
 	if sz < 1 {
 		panic("sz < 1")
 	}
-	return Chan{&innerChan{
-		q:       make([]aValue, sz),
+	n := ncpu
+	if sz < n {
+		n = sz
+	}
+	ch := Chan{&innerChan{
+		q:       make([][]aValue, n),
 		sendIdx: ^uint32(0),
 		recvIdx: ^uint32(0),
 	}}
+	for i := range ch.q {
+		ch.q[i] = make([]aValue, sz/n)
+	}
+	return ch
 }
 
 // Send adds v to the buffer of the channel and returns true, if the channel is closed it returns false
@@ -43,7 +53,7 @@ func (ch Chan) Send(v interface{}, block bool) bool {
 	if !block && ch.Len() == ch.Cap() {
 		return false
 	}
-	ln, cnt := uint32(len(ch.q)), uint32(0)
+	qln, ln, cnt := uint32(len(ch.q)), uint32(len(ch.q[0])), uint32(0)
 	for !ch.Closed() {
 		if ch.Len() == ch.Cap() {
 			if !block {
@@ -53,7 +63,7 @@ func (ch Chan) Send(v interface{}, block bool) bool {
 			continue
 		}
 		i := atomic.AddUint32(&ch.sendIdx, 1)
-		if ch.q[i%ln].CompareAndSwapIfNil(v) {
+		if ch.q[i%qln][i%ln].CompareAndSwapIfNil(v) {
 			atomic.AddUint32(&ch.slen, 1)
 			return true
 		}
@@ -75,7 +85,7 @@ func (ch Chan) Recv(block bool) (interface{}, bool) {
 	if !block && ch.Len() == 0 { // fast path
 		return zeroValue, false
 	}
-	ln, cnt := uint32(len(ch.q)), uint32(0)
+	qln, ln, cnt := uint32(len(ch.q)), uint32(len(ch.q[0])), uint32(0)
 	for chln := ch.Len(); !ch.Closed() || chln > 0; chln = ch.Len() {
 		if chln == 0 {
 			if !block {
@@ -85,7 +95,7 @@ func (ch Chan) Recv(block bool) (interface{}, bool) {
 			continue
 		}
 		i := atomic.AddUint32(&ch.recvIdx, 1)
-		if v, ok := ch.q[i%ln].SwapWithNil(); ok {
+		if v, ok := ch.q[i%qln][i%ln].SwapWithNil(); ok {
 			atomic.AddUint32(&ch.rlen, 1)
 			return v, true
 		}
