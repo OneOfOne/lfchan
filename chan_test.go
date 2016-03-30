@@ -2,6 +2,7 @@ package lfchan
 
 import (
 	"flag"
+	"runtime"
 	"sync"
 	"testing"
 	"time"
@@ -54,8 +55,7 @@ func TestSelect(t *testing.T) {
 }
 
 func TestFIFO(t *testing.T) {
-	t.SkipNow() // broken atm
-	const N = 10000
+	const N = 1e5
 	ch := NewSize(100)
 
 	go func() {
@@ -77,7 +77,8 @@ func TestFIFO(t *testing.T) {
 
 // needs to run with -count 100 to trigger
 func TestLen(t *testing.T) {
-	const N = 1e4
+	var N = 1000 * (runtime.GOMAXPROCS(0) << 4) // otherwise it gets really slow on < 8 cores.
+	t.Log(N)
 	ch := NewSize(100)
 	var wg sync.WaitGroup
 	wg.Add(N * 2)
