@@ -1,7 +1,5 @@
-//go:generate go run gen.go uint64 typed/uint64Chan
-//-go:generate go run gen.go string typed/stringChan
 
-package lfchan
+package uint64Chan
 
 import (
 	"runtime"
@@ -16,17 +14,14 @@ type innerChan struct {
 	die uint32
 }
 
-// Chan is a lock free channel that supports concurrent channel operations.
 type Chan struct {
 	*innerChan
 }
 
-// New returns a new channel with the buffer set to 1
 func New() Chan {
 	return NewSize(1)
 }
 
-// NewSize creates a buffered channel, with minimum length of 1, may adjust the size to fit better in the internal queue.
 func NewSize(sz int) Chan {
 	if sz < 1 {
 		panic("sz < 1")
@@ -40,8 +35,7 @@ func NewSize(sz int) Chan {
 
 const maxBackoff = time.Millisecond * 10
 
-// Send adds v to the buffer of the channel and returns true, if the channel is closed it returns false
-func (ch Chan) Send(v interface{}, block bool) bool {
+func (ch Chan) Send(v uint64, block bool) bool {
 	if !block && ch.Len() == int(ch.cap) {
 		return false
 	}
@@ -67,9 +61,7 @@ func (ch Chan) Send(v interface{}, block bool) bool {
 	return false
 }
 
-// Recv blocks until a value is available and returns v, true, or if the channel is closed and
-// the buffer is empty, it will return nil, false
-func (ch Chan) Recv(block bool) (interface{}, bool) {
+func (ch Chan) Recv(block bool) (uint64, bool) {
 	for chln := ch.Len(); chln > 0 || (block && !ch.Closed()); chln = ch.Len() {
 		if chln == 0 {
 			time.Sleep(time.Microsecond)
@@ -92,22 +84,16 @@ func (ch Chan) Recv(block bool) (interface{}, bool) {
 	return zeroValue, false
 }
 
-// SendOnly returns a send-only channel.
 func (ch Chan) SendOnly() SendOnly { return SendOnly{ch} }
 
-// RecvOnly returns a receive-only channel.
 func (ch Chan) RecvOnly() RecvOnly { return RecvOnly{ch} }
 
-// Close marks the channel as closed
 func (ch Chan) Close() { atomic.StoreUint32(&ch.die, 1) }
 
-// Closed returns true if the channel have been closed
 func (ch Chan) Closed() bool { return atomic.LoadUint32(&ch.die) == 1 }
 
-// Cap returns the size of the internal queue
 func (ch Chan) Cap() int { return int(ch.cap) }
 
-// Len returns the number of elements queued
 func (ch Chan) Len() int {
 	for {
 		if ln := atomic.LoadInt32(&ch.len); ln > -1 {
@@ -117,9 +103,7 @@ func (ch Chan) Len() int {
 	}
 }
 
-// SelectSend sends v to the first available channel, if block is true, it blocks until a channel a accepts the value.
-// returns false if all channels were full and block is false.
-func SelectSend(block bool, v interface{}, chans ...Sender) bool {
+func SelectSend(block bool, v uint64, chans ...Sender) bool {
 	for {
 		for i := range chans {
 			if ok := chans[i].Send(v, false); ok {
@@ -133,9 +117,7 @@ func SelectSend(block bool, v interface{}, chans ...Sender) bool {
 	}
 }
 
-// SelectRecv returns the first available value from chans, if block is true, it blocks until a value is available.
-// returns nil, false if all channels were empty and block is false.
-func SelectRecv(block bool, chans ...Receiver) (interface{}, bool) {
+func SelectRecv(block bool, chans ...Receiver) (uint64, bool) {
 	for {
 		for i := range chans {
 			if v, ok := chans[i].Recv(false); ok {
@@ -149,26 +131,20 @@ func SelectRecv(block bool, chans ...Receiver) (interface{}, bool) {
 	}
 }
 
-// SendOnly is a send-only channel.
 type SendOnly struct{ c Chan }
 
-// Send is an alias for Chan.Send.
-func (so SendOnly) Send(v interface{}, block bool) bool { return so.c.Send(v, block) }
+func (so SendOnly) Send(v uint64, block bool) bool { return so.c.Send(v, block) }
 
-// Sender represents a Chan or SendOnly.
 type Sender interface {
-	Send(v interface{}, block bool) bool
+	Send(v uint64, block bool) bool
 }
 
-// RecvOnly is a receive-only channel.
 type RecvOnly struct{ c Chan }
 
-// Recv is an alias for Chan.Recv.
-func (ro RecvOnly) Recv(block bool) (interface{}, bool) { return ro.c.Recv(block) }
+func (ro RecvOnly) Recv(block bool) (uint64, bool) { return ro.c.Recv(block) }
 
-// Receiver represents a Chan or RecvOnly.
 type Receiver interface {
-	Recv(block bool) (interface{}, bool)
+	Recv(block bool) (uint64, bool)
 }
 
 var (
@@ -178,10 +154,10 @@ var (
 	_ Receiver = (*RecvOnly)(nil)
 )
 
-var zeroValue interface{}
+var zeroValue uint64
 
 type qvalue struct {
-	v      interface{}
+	v      uint64
 	hasVal bool
 }
 type queue struct {
@@ -205,7 +181,7 @@ func (a *queue) unlock() {
 	atomic.StoreUint32(&a.sl, 0)
 }
 
-func (a *queue) store(newVal interface{}) (b bool) {
+func (a *queue) store(newVal uint64) (b bool) {
 	ln := uint32(len(a.q))
 	a.lock()
 	if a.len == ln {
@@ -226,7 +202,7 @@ DIE:
 	return
 }
 
-func (a *queue) get() (v interface{}, b bool) {
+func (a *queue) get() (v uint64, b bool) {
 	a.lock()
 	if a.len == 0 {
 		goto DIE
