@@ -76,21 +76,23 @@ func TestFIFO(t *testing.T) {
 
 // needs to run with -count 100 to trigger
 func TestLen(t *testing.T) {
-	const N = 10000
+	const N = 1e5
 	ch := NewSize(100)
 	var wg sync.WaitGroup
 	wg.Add(N * 2)
+
 	go func() {
 		for i := 0; i < N; i++ {
 			go func() {
-				defer wg.Done()
 				v, ok := ch.Recv(true)
 				if !ok {
+					wg.Done()
 					t.Fatal("!ok")
 				}
 				if ln := ch.Len(); ln < 0 {
 					t.Fatalf("ch.Len() == %d: %v", ln, v)
 				}
+				wg.Done()
 			}()
 		}
 	}()
@@ -98,12 +100,11 @@ func TestLen(t *testing.T) {
 	go func() {
 		for i := 0; i < N; i++ {
 			go func(i int) {
-				defer wg.Done()
 				ch.Send(i, true)
+				wg.Done()
 			}(i)
 		}
 	}()
-
 	wg.Wait()
 	ch.Close()
 	t.Logf("sendIdx: %d, recvIdx: %d", ch.sendIdx, ch.recvIdx)

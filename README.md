@@ -110,6 +110,8 @@ func main() {
 
 # Known issues
 
+- Doesn't scale correctly on true SMP systems (issue [#3](https://github.com/OneOfOne/lfchan/issues/3)).
+
 - <strike>Under high concurrency, ch.Len() can return -1 (issue [#2](https://github.com/OneOfOne/lfchan/issues/2))</strike>
 Fixed by commit [bdddd90](https://github.com/OneOfOne/lfchan/commit/bdddd904676fc8368064cc2eb21efaa4384cd2db).
 
@@ -124,18 +126,17 @@ for example it can't handle sending 0 on an int channel</strike> Fixed.
 # Intel(R) Core(TM) i7-4790 CPU @ 3.60GHz
 # Linux 4.4.5 x86_64
 
-➜ go test -bench=. -benchmem  -run NONE -cpu 1,4,8 -benchtime 10s
-# ch := NewSize(100)
-BenchmarkLFChan         100000000              190 ns/op              40 B/op          4 allocs/op
-BenchmarkLFChan-4       100000000              208 ns/op              40 B/op          4 allocs/op
-BenchmarkLFChan-8       100000000              149 ns/op              40 B/op          4 allocs/op
+➜ go test -bench=. -benchmem -cpu 1,4,8 -benchtime 10s
+BenchmarkLFChan         100000000              157 ns/op               8 B/op          1 allocs/op
+BenchmarkLFChan-4       100000000              187 ns/op               8 B/op          1 allocs/op
+BenchmarkLFChan-8       100000000              168 ns/op               8 B/op          1 allocs/op
 
-# ch := make(chan interface{}, 100)
-BenchmarkChan           100000000              100 ns/op               8 B/op          1 allocs/op
-BenchmarkChan-4         50000000               252 ns/op               8 B/op          1 allocs/op
-BenchmarkChan-8         50000000               330 ns/op               8 B/op          1 allocs/op
+BenchmarkChan           200000000             96.2 ns/op               8 B/op          1 allocs/op
+BenchmarkChan-4         50000000               244 ns/op               8 B/op          1 allocs/op
+BenchmarkChan-8         50000000               323 ns/op               8 B/op          1 allocs/op
+
 PASS
-ok      github.com/OneOfOne/lfchan      95.414s
+ok      github.com/OneOfOne/lfchan      124.067s
 ```
 
 **check** [issue #3](https://github.com/OneOfOne/lfchan/issues/3) for more benchmarks and updates.

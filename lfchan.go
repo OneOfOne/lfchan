@@ -4,7 +4,6 @@ import (
 	"runtime"
 	"sync/atomic"
 	"time"
-	"unsafe"
 )
 
 var nprocs int
@@ -14,11 +13,10 @@ func init() {
 }
 
 type innerChan struct {
-	q       [][]aValue
+	q       []queue
 	sendIdx uint32
 	recvIdx uint32
-	slen    uint32
-	rlen    uint32
+	len     int32
 	die     uint32
 }
 
@@ -45,43 +43,50 @@ func NewSize(sz int) Chan {
 		sz += (sz % n)
 	}
 	ch := Chan{&innerChan{
-		q:       make([][]aValue, n),
+		q:       make([]queue, n),
 		sendIdx: ^uint32(0),
 		recvIdx: ^uint32(0),
 	}}
-	//q := make([]aValue, sz/n)
 	for i := range ch.q {
-		ch.q[i] = make([]aValue, sz/n)
+		ch.q[i].q = make([]qvalue, sz/n)
 	}
 	return ch
 }
+
+const maxBackoff = time.Millisecond * 10
 
 // Send adds v to the buffer of the channel and returns true, if the channel is closed it returns false
 func (ch Chan) Send(v interface{}, block bool) bool {
 	if !block && ch.Len() == ch.Cap() {
 		return false
 	}
-	qln, ln, cnt := uint32(len(ch.q)), uint32(len(ch.q[0])), uint32(0)
-	for !ch.Closed() {
-		if ch.Len() == int(ln) {
-			if !block {
-				break
-			}
-			runtime.Gosched()
-			continue
+	var (
+		qln     = uint32(len(ch.q))
+		ccap    = ch.Cap()
+		backoff = time.Millisecond
+		i       uint32
+		cnt     int
+	)
+	for chln := ch.Len(); !ch.Closed(); chln = ch.Len() {
+		if chln == ccap {
+			goto CHECK
 		}
-		i := atomic.AddUint32(&ch.sendIdx, 1)
-		qIdx, sIdx := i%qln, i%ln
-		if ch.q[qIdx][sIdx].CompareAndSwapIfNil(v) {
-			atomic.AddUint32(&ch.slen, 1)
+		i = atomic.AddUint32(&ch.sendIdx, 1)
+		if ch.q[i%qln].CompareAndSwapIfNil(i, v) {
+			atomic.AddInt32(&ch.len, 1)
 			return true
 		}
+	CHECK:
 		if block {
-			if i > 0 && qln > 1 && sIdx == 0 {
-				//				log.Println(i, qln, ln, qIdx, sIdx)
-				time.Sleep(time.Millisecond)
+			if i%uint32(ch.Cap()) == 0 {
+				time.Sleep(backoff)
+				if backoff += time.Millisecond; backoff > maxBackoff {
+					backoff = time.Microsecond
+				}
 			}
-		} else if cnt++; cnt == ln {
+		} else if chln == 0 {
+			break
+		} else if cnt++; cnt == ccap {
 			break
 		}
 		runtime.Gosched()
@@ -92,29 +97,34 @@ func (ch Chan) Send(v interface{}, block bool) bool {
 // Recv blocks until a value is available and returns v, true, or if the channel is closed and
 // the buffer is empty, it will return nil, false
 func (ch Chan) Recv(block bool) (interface{}, bool) {
-	if !block && ch.Len() == 0 { // fast path
-		return zeroValue, false
-	}
-	qln, ln, cnt := uint32(len(ch.q)), uint32(len(ch.q[0])), uint32(0)
+	var (
+		qln     = uint32(len(ch.q))
+		ccap    = ch.Cap()
+		backoff = time.Millisecond
+		i       uint32
+		cnt     int
+	)
 	for chln := ch.Len(); !ch.Closed() || chln > 0; chln = ch.Len() {
 		if chln == 0 {
-			if !block {
-				break
-			}
-			runtime.Gosched()
-			continue
+			goto CHECK
 		}
-		i := atomic.AddUint32(&ch.recvIdx, 1)
-		qIdx, sIdx := i%qln, i%ln
-		if v, ok := ch.q[qIdx][sIdx].SwapWithNil(); ok {
-			atomic.AddUint32(&ch.rlen, 1)
+		i = atomic.AddUint32(&ch.recvIdx, 1)
+		if v, ok := ch.q[i%qln].SwapWithNil(i); ok {
+			atomic.AddInt32(&ch.len, -1)
 			return v, true
 		}
+
+	CHECK:
 		if block {
-			if qIdx == ln-1 {
-				time.Sleep(time.Millisecond)
+			if i%uint32(ccap) == 0 {
+				time.Sleep(backoff)
+				if backoff += time.Millisecond; backoff > maxBackoff {
+					backoff = time.Microsecond
+				}
 			}
-		} else if cnt++; cnt == ln {
+		} else if chln == 0 {
+			break
+		} else if cnt++; cnt == ccap {
 			break
 		}
 		runtime.Gosched()
@@ -135,10 +145,18 @@ func (ch Chan) Close() { atomic.StoreUint32(&ch.die, 1) }
 func (ch Chan) Closed() bool { return atomic.LoadUint32(&ch.die) == 1 }
 
 // Cap returns the size of the internal queue
-func (ch Chan) Cap() int { return len(ch.q[0]) * len(ch.q) }
+func (ch Chan) Cap() int { return len(ch.q[0].q) * len(ch.q) }
 
 // Len returns the number of elements queued
-func (ch Chan) Len() int { return int(atomic.LoadUint32(&ch.slen) - atomic.LoadUint32(&ch.rlen)) }
+func (ch Chan) Len() int {
+	for {
+		if ln := atomic.LoadInt32(&ch.len); ln > -1 {
+			return int(ln)
+		}
+		//log.Println(atomic.LoadInt32(&ch.len))
+		runtime.Gosched()
+	}
+}
 
 // SelectSend sends v to the first available channel, if block is true, it blocks until a channel a accepts the value.
 // returns false if all channels were full and block is false.
@@ -203,19 +221,45 @@ var (
 
 var zeroValue interface{}
 
-type aValue struct {
-	v interface{}
+type qvalue struct {
+	v      interface{}
+	hasVal bool
+}
+type queue struct {
+	q  []qvalue
+	sl int32
 }
 
-func (a *aValue) CompareAndSwapIfNil(newVal interface{}) bool {
-	x := unsafe.Pointer(&a.v)
-	return atomic.CompareAndSwapPointer((*unsafe.Pointer)(atomic.LoadPointer(&x)), nil, unsafe.Pointer(&newVal))
-}
-
-func (a *aValue) SwapWithNil() (interface{}, bool) {
-	x := unsafe.Pointer(&a.v)
-	if v := atomic.SwapPointer((*unsafe.Pointer)(atomic.LoadPointer(&x)), nil); v != nil {
-		return *(*interface{})(v), true
+func (a *queue) lock() {
+	for i := uint(0); !atomic.CompareAndSwapInt32(&a.sl, 0, 1); i++ {
+		if i%1000 == 0 {
+			time.Sleep(time.Millisecond)
+		}
+		runtime.Gosched()
 	}
-	return zeroValue, false
+}
+
+func (a *queue) unlock() {
+	atomic.StoreInt32(&a.sl, 0)
+}
+
+func (a *queue) CompareAndSwapIfNil(i uint32, newVal interface{}) (b bool) {
+	i = i % uint32(len(a.q))
+	a.lock()
+	qv := &a.q[i]
+	if b = !qv.hasVal; b {
+		qv.v, qv.hasVal = newVal, true
+	}
+	a.unlock()
+	return
+}
+
+func (a *queue) SwapWithNil(i uint32) (interface{}, bool) {
+	i = i % uint32(len(a.q))
+	a.lock()
+	qv := &a.q[i]
+	v, b := qv.v, qv.hasVal
+	qv.v, qv.hasVal = zeroValue, false
+	a.unlock()
+	return v, b
 }
