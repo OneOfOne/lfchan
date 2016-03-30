@@ -146,7 +146,7 @@ func main() {
 	}
 
 	if *genTest {
-		if err := ioutil.WriteFile(filepath.Join(pkgName, fnamePre+"chan_test.go"), []byte(repl.Replace(testCode)), 0644); err != nil {
+		if err := ioutil.WriteFile(filepath.Join(pkgName, fnamePre+"lfchan_test.go"), []byte(repl.Replace(testCode)), 0644); err != nil {
 			log.Fatal(err)
 		}
 		out, err := exec.Command("go", "test", "-run=Chan", "./...").CombinedOutput()
